@@ -128,10 +128,59 @@ public:
 			Result = &Set( Filename, FConfigFile() );
 			Result->Read( Filename );
 		}
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+		// UT99_ANDROID_V221_FRENCH_LANGUAGE:
+		// Retail localization files are often lower case (botpack.frt,
+		// utmenu.frt) while packages may be named Botpack or BotPack, and
+		// Android storage is case-sensitive.  Fall back to a case-insensitive
+		// lookup for localization files only, and cache misses as empty
+		// read-only files so Localize() does not rescan the directory.
+		else if( !Result && !IsIniFilename(Filename) )
+		{
+			Result = &Set( Filename, FConfigFile() );
+			Result->NoSave = 1;
+			TCHAR Actual[256];
+			if( FindCaseInsensitive( Filename, Actual ) )
+			{
+				debugf( NAME_Localization, TEXT("Case-insensitive localization: %s -> %s"), Filename, Actual );
+				Result->Read( Actual );
+			}
+		}
+#endif
 		return Result;
 
 		unguard;
 	}
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	static UBOOL IsIniFilename( const TCHAR* Filename )
+	{
+		INT Len = appStrlen(Filename);
+		return Len>=4 && appStricmp( Filename+Len-4, TEXT(".ini") )==0;
+	}
+	static UBOOL FindCaseInsensitive( const TCHAR* Filename, TCHAR* Out )
+	{
+		TCHAR Dir[256];
+		appStrncpy( Dir, Filename, ARRAY_COUNT(Dir) );
+		TCHAR* Base = Dir;
+		for( TCHAR* Cur=Dir; *Cur; Cur++ )
+			if( *Cur=='/' || *Cur=='\\' )
+				Base = Cur+1;
+		const TCHAR* Name = Filename + (Base-Dir);
+		*Base = 0;
+		TCHAR Spec[256];
+		appSprintf( Spec, TEXT("%s*"), Dir );
+		TArray<FString> Files = GFileManager->FindFiles( Spec, 1, 0 );
+		for( INT i=0; i<Files.Num(); i++ )
+		{
+			if( appStricmp( *Files(i), Name )==0 )
+			{
+				appSprintf( Out, TEXT("%s%s"), Dir, *Files(i) );
+				return 1;
+			}
+		}
+		return 0;
+	}
+#endif
 	void Flush( UBOOL Read, const TCHAR* Filename=NULL )
 	{
 		guard(FConfigCacheIni::Flush);

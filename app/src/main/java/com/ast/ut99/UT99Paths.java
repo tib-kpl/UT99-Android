@@ -27,6 +27,8 @@ final class UT99Paths {
     // On launch it is copied into <files>/UT99/System/UMenu.u once per version,
     // so release APKs carry the lean Android menu without manual adb pushes.
     private static final String TAG = "UT99Paths";
+    static final String LANGUAGE_ENGLISH = "int";
+    static final String LANGUAGE_FRENCH = "frt";
     private static final int UT_PACKAGE_TAG = 0x9E2A83C1;
     private static final int UT_V400_PACKAGE_VERSION = 68;
     private static final String BUNDLED_SYSTEM_PATCH_DIR = "ut99_patches/System";
@@ -559,6 +561,10 @@ final class UT99Paths {
     }
 
     static boolean ensureAndroidIni(File root) throws IOException {
+        return ensureAndroidIni(root, LANGUAGE_ENGLISH);
+    }
+
+    static boolean ensureAndroidIni(File root, String preferredLanguage) throws IOException {
         if (root == null) {
             throw new IOException("Data root is null");
         }
@@ -595,7 +601,7 @@ final class UT99Paths {
             writeUtf8(userIni, buildAndroidUserIni());
             created = true;
         }
-        ensureAndroidEnglishLanguageConfig(system);
+        ensureAndroidLanguageConfig(system, resolveGameLanguage(system, preferredLanguage));
         ensureAndroidLeanMenuConfig(system);
         ensureAndroidControllerBindingConfig(system); // UT99_ANDROID_CONTROLLER_BINDING_FIX_V117
         ensureAndroidControllerFriendlyKeyNames(system); // UT99_ANDROID_CONTROLLER_KEY_NAMES_V118
@@ -884,14 +890,38 @@ final class UT99Paths {
         }
     }
 
-    private static void ensureAndroidEnglishLanguageConfig(File systemDir) throws IOException {
+    /**
+     * Maps an Android locale to a UT99 localization extension.  Only languages
+     * whose localization files ship with the retail game data are mapped;
+     * everything else stays on the original INT/English text.
+     */
+    static String gameLanguageForLocale(java.util.Locale locale) {
+        if (locale != null && "fr".equalsIgnoreCase(locale.getLanguage())) return LANGUAGE_FRENCH;
+        return LANGUAGE_ENGLISH;
+    }
+
+    private static String resolveGameLanguage(File systemDir, String preferred) {
+        // UT99_ANDROID_V221_FRENCH_LANGUAGE:
+        // Only leave INT when the central menu and gameplay localizations
+        // exist; individual missing keys still fall back to INT in Localize().
+        // Retail files are often lower case (botpack.frt); the engine's
+        // FConfigCacheIni resolves them case-insensitively on Android.
+        if (LANGUAGE_FRENCH.equals(preferred)
+                && findCaseVariant(systemDir, "UMenu.frt") != null
+                && findCaseVariant(systemDir, "Botpack.frt") != null) {
+            return LANGUAGE_FRENCH;
+        }
+        return LANGUAGE_ENGLISH;
+    }
+
+    private static void ensureAndroidLanguageConfig(File systemDir, String language) throws IOException {
         if (systemDir == null) return;
 
-        // UT99_ANDROID_V204_ENGLISH_ONLY_LANGUAGE:
-        // The Android port intentionally uses the original INT/English localization.
-        // Force every known engine INI to Language=int on every launch so stale
-        // Russian/other language settings from old installs cannot re-enable a
-        // localization the Android package does not ship.  Read/write through
+        // UT99_ANDROID_V204_ENGLISH_ONLY_LANGUAGE / UT99_ANDROID_V221_FRENCH_LANGUAGE:
+        // Force every known engine INI to the resolved language (int or frt) on
+        // every launch so stale Russian/other language settings from old
+        // installs cannot re-enable a localization the Android port does not
+        // support.  Read/write through
         // ISO-8859-1 so every non-ASCII byte in legacy CP1251 INIs is preserved
         // exactly; only the ASCII Language= line is changed.
         String[] names = {"AndroidUT99.ini", "Default.ini", "UnrealTournament.ini", "DCUtil.ini", "DefaultDCUtil.ini"};
@@ -900,17 +930,18 @@ final class UT99Paths {
             if (!ini.isFile() || ini.length() == 0L) continue;
 
             String text = readBytePreservingText(ini);
-            String updated = forceEnglishLanguageValue(text);
+            String updated = setLanguageValue(text, language);
             if (!updated.equals(text)) {
                 writeBytePreservingText(ini, updated);
-                Log.i(TAG, "UT99_ANDROID_V204_ENGLISH_ONLY_LANGUAGE forced " + name + " Language=int");
+                Log.i(TAG, "UT99_ANDROID_V221_FRENCH_LANGUAGE set " + name + " Language=" + language);
             }
         }
     }
 
-    private static String forceEnglishLanguageValue(String text) {
+    private static String setLanguageValue(String text, String language) {
         if (text == null) text = "";
         final String section = "[Engine.Engine]";
+        final String languageLine = "Language=" + language;
         final String eol = text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
         String normalized = text.replace("\r\n", "\n").replace('\r', '\n');
         String[] lines = normalized.split("\n", -1);
@@ -925,7 +956,7 @@ final class UT99Paths {
 
             if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
                 if (inEngineSection && !foundLanguage) {
-                    out.append("Language=int").append('\n');
+                    out.append(languageLine).append('\n');
                     foundLanguage = true;
                 }
                 inEngineSection = "[engine.engine]".equalsIgnoreCase(trimmed);
@@ -936,10 +967,10 @@ final class UT99Paths {
             }
 
             if (inEngineSection && isLanguageLine(trimmed)) {
-                // Keep indentation only; the value itself is intentionally fixed.
+                // Keep indentation only; the value itself is chosen by Android.
                 int firstNonWs = 0;
                 while (firstNonWs < line.length() && Character.isWhitespace(line.charAt(firstNonWs))) firstNonWs++;
-                line = line.substring(0, firstNonWs) + "Language=int";
+                line = line.substring(0, firstNonWs) + languageLine;
                 foundLanguage = true;
             }
 
@@ -949,13 +980,13 @@ final class UT99Paths {
 
         if (inEngineSection && !foundLanguage) {
             if (out.length() > 0 && out.charAt(out.length() - 1) != '\n') out.append('\n');
-            out.append("Language=int").append('\n');
+            out.append(languageLine).append('\n');
         } else if (!sawEngineSection) {
             if (out.length() > 0 && out.charAt(out.length() - 1) != '\n') out.append('\n');
             out.append('\n')
                     .append("; UT99_ANDROID_V204_ENGLISH_ONLY_LANGUAGE").append('\n')
                     .append(section).append('\n')
-                    .append("Language=int").append('\n');
+                    .append(languageLine).append('\n');
         }
 
         String result = out.toString();

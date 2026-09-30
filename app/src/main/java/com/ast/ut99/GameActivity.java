@@ -176,7 +176,12 @@ public class GameActivity extends SDLActivity {
             UT99Paths.normalizeInstalledDataRoot(dataRoot);
             UT99Paths.rememberDataRoot(this, dataRoot);
             UT99Paths.ensureBundledSystemPatches(this, dataRoot);
-            androidIniCreatedV86 = UT99Paths.ensureAndroidIni(dataRoot);
+            // UT99_ANDROID_V221_FRENCH_LANGUAGE: follow the app language
+            // (Android 13+ per-app setting, otherwise the device language).
+            java.util.Locale appLocale = android.os.Build.VERSION.SDK_INT >= 24
+                    ? getResources().getConfiguration().getLocales().get(0)
+                    : getResources().getConfiguration().locale;
+            androidIniCreatedV86 = UT99Paths.ensureAndroidIni(dataRoot, UT99Paths.gameLanguageForLocale(appLocale));
             if (legacySafeMode && androidIniCreatedV86) {
                 applyLegacyOuyaSafeIni(dataRoot);
             } else if (legacySafeMode) {
