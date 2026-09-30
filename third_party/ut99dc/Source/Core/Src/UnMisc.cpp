@@ -1751,17 +1751,20 @@ CORE_API void appInit( const TCHAR* InPackage, const TCHAR* InCmdLine, FMalloc* 
 	// Language.
 	TCHAR Temp[256];
 #if defined(PLATFORM_ANDROID)
-	// UT99_ANDROID_V204_ENGLISH_ONLY_LANGUAGE:
-	// Android intentionally runs the original INT/English localization only.
-	// Java persists Language=int in the known INIs, while this runtime guard
-	// makes the choice unconditional even if a stale/custom config slips through.
-	if( GConfig->GetString( TEXT("Engine.Engine"), TEXT("Language"), Temp, ARRAY_COUNT(Temp) )
-	 && appStricmp( Temp, TEXT("int") )!=0 )
+	// UT99_ANDROID_V204_ENGLISH_ONLY_LANGUAGE / UT99_ANDROID_V221_FRENCH_LANGUAGE:
+	// Android supports the original INT/English and the retail FRT/French
+	// localizations.  Java persists the chosen value in the known INIs, while
+	// this runtime guard resets anything else (e.g. a stale rut) to int.
+	const TCHAR* Language = TEXT("int");
+	if( GConfig->GetString( TEXT("Engine.Engine"), TEXT("Language"), Temp, ARRAY_COUNT(Temp) ) )
 	{
-		debugf( NAME_Init, TEXT("Android Language=%s overridden to int"), Temp );
+		if( appStricmp( Temp, TEXT("frt") )==0 )
+			Language = TEXT("frt");
+		else if( appStricmp( Temp, TEXT("int") )!=0 )
+			debugf( NAME_Init, TEXT("Android Language=%s overridden to int"), Temp );
 	}
-	GConfig->SetString( TEXT("Engine.Engine"), TEXT("Language"), TEXT("int") );
-	UObject::SetLanguage( TEXT("int") );
+	GConfig->SetString( TEXT("Engine.Engine"), TEXT("Language"), Language );
+	UObject::SetLanguage( Language );
 #else
 	if( GConfig->GetString( TEXT("Engine.Engine"), TEXT("Language"), Temp, ARRAY_COUNT(Temp) ) )
 		UObject::SetLanguage( Temp );
