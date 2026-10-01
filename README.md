@@ -2,6 +2,17 @@
 
 # Unreal Tournament (UT99) Android
 
+> [!NOTE]
+> **Fork pour la traduction française** de [Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android).
+> - Le jeu passe en français quand l'app est en français (langue du téléphone, ou réglage de langue par app sous Android 13+).
+> - Il utilise la traduction officielle (`.frt`) présente dans les données du jeu ; le moteur trouve aussi les fichiers en minuscules (`botpack.frt`…).
+> - Les liens de téléchargement plus bas mènent aux versions officielles, sans ces changements.
+>
+> **Fork for the French translation** of [Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android).
+> The game plays in French when the app's language is French (device language, or the per-app language setting on Android 13+),
+> with the official French localization (`.frt`) of the game data; the engine also finds lower-case file names.
+> The download links below lead to the upstream builds, without these changes.
+
 <p align="left">
   <a href="README.md">README</a>
   &nbsp;|&nbsp;
