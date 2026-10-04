@@ -1,0 +1,79 @@
+name: Build Android APKs
+
+# Builds the release APKs of both flavors (normal: phones, tablets, TV, OUYA;
+# automotive: Android Automotive OS) on every push, and signs them with the
+# ANDROID_KEYSTORE_BASE64 secret (a keystore, base64), ANDROID_KEYSTORE_PASSWORD
+# (its password and the key's) and ANDROID_KEY_ALIAS, so each build installs
+# over the one before. Without the secrets the APKs are left unsigned.
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # the versions app/build.gradle asks for
+      - name: Android NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "ndk;23.2.8568313" "cmake;3.22.1" > /dev/null
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew --console=plain assembleNormalRelease assembleAutomotiveRelease
+
+      - name: Sign
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
+          version="$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" app/build.gradle | head -n 1)"
+          mkdir dist
+          if [ -n "$KEYSTORE" ]; then
+            printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+          else
+            echo "::warning::no ANDROID_KEYSTORE_BASE64 secret: the APKs are unsigned"
+          fi
+          for flavor in normal automotive; do
+            in="app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
+            out="dist/UT99-Android-$version-fr-$flavor-release.apk"
+            if [ -n "$KEYSTORE" ]; then
+              "$tools/zipalign" -f -p 4 "$in" "$RUNNER_TEMP/aligned.apk"
+              "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "${ALIAS:-ut99}" \
+                --ks-pass env:PASSWORD --key-pass env:PASSWORD --out "$out" "$RUNNER_TEMP/aligned.apk"
+              "$tools/apksigner" verify "$out"
+            else
+              cp "$in" "${out%.apk}-unsigned.apk"
+            fi
+          done
+          rm -f "$RUNNER_TEMP/release.jks" dist/*.idsig
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UT99-Android-APK
+          path: dist/*.apk
+          retention-days: 14
