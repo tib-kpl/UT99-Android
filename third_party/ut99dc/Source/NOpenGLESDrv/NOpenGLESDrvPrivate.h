@@ -182,6 +182,9 @@ class DLL_EXPORT UNOpenGLESRenderDevice : public URenderDevice
 	void UpdateTextureFilter( const FTextureInfo& Info, DWORD PolyFlags );
 
 private:
+	UBOOL BlurMenuBackdrop();
+	GLuint MenuBlurProgram, MenuBlurTextures[2], MenuBlurFramebuffer, MenuBlurBuffer;
+	INT MenuBlurWidth, MenuBlurHeight;
 	// Fixed function mode emulation.
 	inline void FlushTriangles()
 	{

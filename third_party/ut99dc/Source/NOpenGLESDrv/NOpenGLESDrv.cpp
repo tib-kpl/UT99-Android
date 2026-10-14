@@ -303,6 +303,8 @@ void UNOpenGLESRenderDevice::StaticConstructor()
 
 UNOpenGLESRenderDevice::UNOpenGLESRenderDevice()
 {
+	MenuBlurProgram = MenuBlurTextures[0] = MenuBlurTextures[1] = MenuBlurFramebuffer = MenuBlurBuffer = 0;
+	MenuBlurWidth = MenuBlurHeight = 0;
 	// UT99_ANDROID_V138_VISUAL_GAMEPLAY_DEFAULTS:
 	// Keep the renderer's inherited high-detail flags enabled by default.
 	// The first-person weapon muzzle flash is guarded by Level.bHighDetailMode,
@@ -446,6 +448,12 @@ void UNOpenGLESRenderDevice::Exit()
 	guard(UNOpenGLESRenderDevice::Exit);
 
 	debugf( NAME_Log, "Shutting down OpenGL ES2 renderer" );
+	glDeleteTextures(2, MenuBlurTextures);
+	if(MenuBlurFramebuffer) glDeleteFramebuffers(1, &MenuBlurFramebuffer);
+	if(MenuBlurBuffer) glDeleteBuffers(1, &MenuBlurBuffer);
+	if(MenuBlurProgram) glDeleteProgram(MenuBlurProgram);
+	MenuBlurProgram = MenuBlurTextures[0] = MenuBlurTextures[1] = MenuBlurFramebuffer = MenuBlurBuffer = 0;
+	MenuBlurWidth = MenuBlurHeight = 0;
 
 	Flush( 0 );
 
@@ -488,6 +496,126 @@ void UNOpenGLESRenderDevice::Flush( UBOOL AllowPrecache )
 	unguard;
 }
 
+// Called by the custom root before drawing any menu widgets. Keep the renderer's
+// cached GL state valid by restoring everything touched by these two passes.
+UBOOL UNOpenGLESRenderDevice::BlurMenuBackdrop()
+{
+#ifdef PLATFORM_ANDROID
+    FlushTriangles();
+    INT W, H;
+    UT99AndroidGetDrawableSizeV27(Viewport, W, H);
+    if(W <= 0 || H <= 0) return 0;
+    GLint Program, Buffer, Active, Texture0, Framebuffer, View[4];
+    GLint AttrEnabled, AttrSize, AttrType, AttrNormalized, AttrStride, AttrBuffer;
+    void* AttrPointer = NULL;
+    GLboolean ColorMask[4], DepthMask;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &Program);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &Buffer);
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &Active);
+    glActiveTexture(GL_TEXTURE0);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &Texture0);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &Framebuffer);
+    glGetIntegerv(GL_VIEWPORT, View);
+    glGetBooleanv(GL_COLOR_WRITEMASK, ColorMask);
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &DepthMask);
+    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &AttrEnabled);
+    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_SIZE, &AttrSize);
+    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_TYPE, &AttrType);
+    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &AttrNormalized);
+    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &AttrStride);
+    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &AttrBuffer);
+    glGetVertexAttribPointerv(0, GL_VERTEX_ATTRIB_ARRAY_POINTER, &AttrPointer);
+    const GLenum Caps[] = {GL_DEPTH_TEST, GL_BLEND, GL_SCISSOR_TEST, GL_CULL_FACE};
+    GLboolean Enabled[4];
+    for(INT i=0; i<4; ++i) { Enabled[i] = glIsEnabled(Caps[i]); glDisable(Caps[i]); }
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_FALSE);
+    UBOOL Success = 0;
+    if(!MenuBlurProgram)
+    {
+        const char* VS = "attribute vec2 position; varying vec2 uv; void main(){ uv=position*0.5+0.5; gl_Position=vec4(position,0.0,1.0); }";
+        const char* FS = "precision mediump float; varying vec2 uv; uniform sampler2D scene; uniform vec2 stepUV; uniform float shade; void main(){ vec3 c=texture2D(scene,uv).rgb*0.227027; c+=(texture2D(scene,uv+stepUV*1.384615).rgb+texture2D(scene,uv-stepUV*1.384615).rgb)*0.316216; c+=(texture2D(scene,uv+stepUV*3.230769).rgb+texture2D(scene,uv-stepUV*3.230769).rgb)*0.070270; gl_FragColor=vec4(c*shade,1.0); }";
+        GLuint V = glCreateShader(GL_VERTEX_SHADER), F = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(V,1,&VS,NULL); glCompileShader(V);
+        glShaderSource(F,1,&FS,NULL); glCompileShader(F);
+        MenuBlurProgram = glCreateProgram();
+        glAttachShader(MenuBlurProgram,V); glAttachShader(MenuBlurProgram,F);
+        glBindAttribLocation(MenuBlurProgram,0,"position"); glLinkProgram(MenuBlurProgram);
+        glDeleteShader(V); glDeleteShader(F);
+        GLint Linked = 0; glGetProgramiv(MenuBlurProgram,GL_LINK_STATUS,&Linked);
+        if(!Linked) { glDeleteProgram(MenuBlurProgram); MenuBlurProgram = 0; }
+        if(MenuBlurProgram)
+        {
+            glGenTextures(2,MenuBlurTextures);
+            glGenFramebuffers(1,&MenuBlurFramebuffer);
+            glGenBuffers(1,&MenuBlurBuffer);
+            const GLfloat Quad[] = {-1,-1, 1,-1, -1,1, 1,1};
+            glBindBuffer(GL_ARRAY_BUFFER,MenuBlurBuffer);
+            glBufferData(GL_ARRAY_BUFFER,sizeof(Quad),Quad,GL_STATIC_DRAW);
+        }
+    }
+    if(MenuBlurProgram)
+    {
+        const INT SmallW = Max(1,W/4), SmallH = Max(1,H/4);
+        if(W != MenuBlurWidth || H != MenuBlurHeight)
+        {
+            for(INT i=0; i<2; ++i)
+            {
+                glBindTexture(GL_TEXTURE_2D,MenuBlurTextures[i]);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+                glTexImage2D(GL_TEXTURE_2D,0,i ? GL_RGBA:GL_RGB,i ? SmallW:W,i ? SmallH:H,0,i ? GL_RGBA:GL_RGB,GL_UNSIGNED_BYTE,NULL);
+            }
+            MenuBlurWidth = W; MenuBlurHeight = H;
+        }
+        glBindTexture(GL_TEXTURE_2D,MenuBlurTextures[0]);
+        glGetError();
+        glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,W,H);
+        const GLenum CopyError = glGetError();
+        static INT BlurLog = 0;
+        if(BlurLog++ < 3) UT99_ANDROID_GLES_LOGI_V28("Menu blur size=%dx%d view=%d,%d,%d,%d fb=%d error=%d",W,H,View[0],View[1],View[2],View[3],Framebuffer,(INT)CopyError);
+        glBindFramebuffer(GL_FRAMEBUFFER,MenuBlurFramebuffer);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,MenuBlurTextures[1],0);
+        if(CopyError == GL_NO_ERROR && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+        {
+            glUseProgram(MenuBlurProgram);
+            glBindBuffer(GL_ARRAY_BUFFER,MenuBlurBuffer);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,NULL);
+            glUniform1i(glGetUniformLocation(MenuBlurProgram,"scene"),0);
+            const GLint Step = glGetUniformLocation(MenuBlurProgram,"stepUV");
+            const GLint Shade = glGetUniformLocation(MenuBlurProgram,"shade");
+            glViewport(0,0,SmallW,SmallH);
+            glUniform2f(Step,4.0f/W,0); glUniform1f(Shade,1);
+            glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+            glBindFramebuffer(GL_FRAMEBUFFER,Framebuffer);
+            glBindTexture(GL_TEXTURE_2D,MenuBlurTextures[1]);
+            glViewport(0,0,W,H);
+            glUniform2f(Step,0,1.0f/SmallH); glUniform1f(Shade,0.80f);
+            glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+            Success = 1;
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER,Framebuffer);
+    glViewport(View[0],View[1],View[2],View[3]);
+    glUseProgram(Program);
+    glBindBuffer(GL_ARRAY_BUFFER,AttrBuffer);
+    glVertexAttribPointer(0,AttrSize,AttrType,AttrNormalized,AttrStride,AttrPointer);
+    if(!AttrEnabled) glDisableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER,Buffer);
+    glBindTexture(GL_TEXTURE_2D,Texture0);
+    glActiveTexture(Active);
+    for(INT i=0; i<4; ++i) if(Enabled[i]) glEnable(Caps[i]);
+    glColorMask(ColorMask[0],ColorMask[1],ColorMask[2],ColorMask[3]);
+    glDepthMask(DepthMask);
+    return Success;
+#else
+    return 0;
+#endif
+}
+
 UBOOL UNOpenGLESRenderDevice::Exec( const TCHAR* Cmd, FOutputDevice& Ar )
 {
 	guard(UNOpenGLESRenderDevice::Exec);
@@ -496,6 +624,11 @@ UBOOL UNOpenGLESRenderDevice::Exec( const TCHAR* Cmd, FOutputDevice& Ar )
 		return 1;
 
 #ifdef PLATFORM_ANDROID
+	if( ParseCommand( &Cmd, TEXT("ANDROID_MENU_BLUR") ) )
+	{
+		Ar.Logf(TEXT("%i"), BlurMenuBackdrop() ? 1 : 0);
+		return 1;
+	}
 	if( ParseCommand( &Cmd, TEXT("UTGETWIDESCREENFOV") ) )
 	{
 		Ar.Logf( TEXT("%i"), WidescreenFOV ? 1 : 0 );

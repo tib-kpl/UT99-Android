@@ -1488,6 +1488,8 @@ static void UT99V72QueueStartToggle( const char* Reason )
     UT99_ANDROID_SDL_LOGI( "UT99_ANDROID_V72_START queued source=%s pending=%d", Reason ? Reason : "", GUT99V72StartToggleRequests );
 }
 
+static UBOOL UT99ConsoleMenuHandleStart( UNSDLViewport* Viewport );
+
 static void UT99V72PumpStartToggle( UNSDLViewport* Viewport, UBOOL bMenu )
 {
     if( !Viewport || GUT99V72StartToggleRequests <= 0 )
@@ -1503,6 +1505,13 @@ static void UT99V72PumpStartToggle( UNSDLViewport* Viewport, UBOOL bMenu )
     }
 
     GUT99V72LastStartToggleSendTime = Now;
+    // The console-style root treats Start as a direct resume toggle in a match.
+    // Escape and Joy2/B retain the scripted per-page Back behavior.
+    if( UT99ConsoleMenuHandleStart( Viewport ) )
+    {
+        UT99_ANDROID_SDL_LOGI( "UT99 console menu: Start resumed gameplay" );
+        return;
+    }
     Viewport->CauseInputEvent( IK_Escape, IST_Press );
     Viewport->CauseInputEvent( IK_Escape, IST_Release );
     UT99_ANDROID_SDL_LOGI( "UT99_ANDROID_V72_START single Escape toggle menu=%d", bMenu ? 1 : 0 );
@@ -2591,6 +2600,21 @@ static UObject* UT99AndroidFindUWindowRootV169E()
     if( !Console )
         return NULL;
     return UT99AndroidFindObjectPropertyV169E( Console, TEXT("Root") );
+}
+
+static UBOOL UT99ConsoleMenuHandleStart( UNSDLViewport* Viewport )
+{
+    if( !Viewport || !Viewport->Console )
+        return 0;
+    UObject* Root = UT99AndroidFindObjectPropertyV169E( (UObject*)Viewport->Console, TEXT("Root") );
+    if( !Root )
+        return 0;
+    UFunction* Handler = Root->FindFunction( FName(TEXT("HandleStartButton")), 0 );
+    if( !Handler )
+        return 0;
+    struct { UBOOL ReturnValue; } Parms = {0};
+    Root->ProcessEvent( Handler, &Parms );
+    return Parms.ReturnValue;
 }
 
 static FLOAT UT99AndroidGetRootScaleV169E( UObject* Root )
