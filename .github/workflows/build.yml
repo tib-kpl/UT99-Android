@@ -40,27 +40,40 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > local.properties
 
       - name: Build
+        env:
+          CONSOLE_MENU: ${{ github.ref == 'refs/heads/feat/console-menu' }}
         run: |
           chmod +x gradlew
-          ./gradlew --console=plain assembleNormalRelease assembleAutomotiveRelease
+          if [ "$CONSOLE_MENU" = true ]; then
+            ./gradlew --console=plain assembleNormalRelease
+          else
+            ./gradlew --console=plain assembleNormalRelease assembleAutomotiveRelease
+          fi
 
       - name: Sign
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          CONSOLE_MENU: ${{ github.ref == 'refs/heads/feat/console-menu' }}
         run: |
           tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
           version="$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" app/build.gradle | head -n 1)"
           mkdir dist
+          flavors="normal automotive"
+          label=""
+          if [ "$CONSOLE_MENU" = true ]; then
+            flavors="normal"
+            label="-console-menu"
+          fi
           if [ -n "$KEYSTORE" ]; then
             printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
           else
             echo "::warning::no ANDROID_KEYSTORE_BASE64 secret: the APKs are unsigned"
           fi
-          for flavor in normal automotive; do
+          for flavor in $flavors; do
             in="app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
-            out="dist/UT99-Android-$version-fr-$flavor-release.apk"
+            out="dist/UT99-Android-$version-fr$label-$flavor-release.apk"
             if [ -n "$KEYSTORE" ]; then
               "$tools/zipalign" -f -p 4 "$in" "$RUNNER_TEMP/aligned.apk"
               "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "${ALIAS:-ut99}" \
@@ -75,9 +88,24 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: UT99-Android-APK
+          name: ${{ github.ref == 'refs/heads/feat/console-menu' && 'UT99-Android-Console-Menu-APK' || 'UT99-Android-APK' }}
           path: dist/*.apk
           retention-days: 14
+
+      - name: Publish console menu prerelease
+        if: github.ref == 'refs/heads/feat/console-menu'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="console-menu-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+          printf '%s\n\nCommit: %s/%s/commit/%s\nBuild: %s/%s/actions/runs/%s\n' \
+            'Version du menu console/PC de la branche feat/console-menu. Les APK unsigned nécessitent une signature avant installation.' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/console-menu-notes.md"
+          gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "UT99 — Menu console/PC (build $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT)" \
+            --notes-file "$RUNNER_TEMP/console-menu-notes.md"
 
       # a successful build of the default branch becomes a GitHub release
       # (build-<run number>, marked latest, the APKs attached); the last five
