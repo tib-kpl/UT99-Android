@@ -216,6 +216,7 @@ public class GameActivity extends SDLActivity {
             android.util.Log.i("UT99Android", "UT99_ANDROID_V86_CONFIG_PRESERVE keeping existing AndroidUT99.ini/AndroidUser.ini");
         }
         applyUt99V65InitialNativeFontScaleConfig(androidIniCreatedV86);
+        applyConsoleMenuConfig();
         ut99V166EnsureResolutionModeConfig();
         super.onCreate(savedInstanceState);
         ut99V55ScheduleFixedSurface(); // v55 onCreate
@@ -698,9 +699,33 @@ public class GameActivity extends SDLActivity {
             String text = ini.exists() ? ut99V60ReadUtf8(ini) : "";
             text = ut99V60UpsertKey(text, "UWindow.UWindowRootWindow", "GUIScale", guiScale);
             text = ut99V60UpsertKey(text, "UMenu.UMenuRootWindow", "GUIScale", guiScale);
+            text = ut99V60UpsertKey(text, "UT99ConsoleMenu.UT99ConsoleRoot", "GUIScale", guiScale);
             ut99V60WriteUtf8(ini, text);
         } catch (Throwable t) {
             android.util.Log.e("UT99Android", "v60 failed to upsert GUI scale in " + ini.getAbsolutePath(), t);
+        }
+    }
+
+    private void applyConsoleMenuConfig() {
+        java.io.File systemDir = new java.io.File(dataRoot, "System");
+        java.io.File ini = new java.io.File(systemDir, "AndroidUT99.ini");
+        try {
+            String text = ini.exists() ? ut99V60ReadUtf8(ini) : "";
+            String[] consoles = {"UTMenu.UTConsole", "UMenu.UnrealConsole", "UWindow.WindowConsole"};
+            for (String section : consoles) {
+                text = ut99V60UpsertKey(text, section, "RootWindow", "UT99ConsoleMenu.UT99ConsoleRoot");
+            }
+            text = ut99V60UpsertKey(text, "UT99ConsoleMenu.UT99ConsoleRoot", "LookAndFeelClass", "UMenu.UMenuGoldLookAndFeel");
+            boolean hasConsoleScale = java.util.regex.Pattern.compile(
+                    "(?ims)^\\[UT99ConsoleMenu\\.UT99ConsoleRoot\\][^\\[]*?^GUIScale\\s*=").matcher(text).find();
+            if (!hasConsoleScale) {
+                java.util.regex.Matcher scale = java.util.regex.Pattern.compile("(?im)^GUIScale\\s*=\\s*([0-9.]+)").matcher(text);
+                String guiScale = scale.find() ? scale.group(1) : "1.0";
+                text = ut99V60UpsertKey(text, "UT99ConsoleMenu.UT99ConsoleRoot", "GUIScale", guiScale);
+            }
+            ut99V60WriteUtf8(ini, text);
+        } catch (java.io.IOException e) {
+            android.util.Log.e("UT99Android", "Cannot configure console menu", e);
         }
     }
 

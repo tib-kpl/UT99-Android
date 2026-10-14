@@ -33,7 +33,7 @@ final class UT99Paths {
     private static final int UT_V400_PACKAGE_VERSION = 68;
     private static final String BUNDLED_SYSTEM_PATCH_DIR = "ut99_patches/System";
     private static final String BUNDLED_SYSTEM_PATCH_MARKER = ".ut99_android_bundled_system_patches_v166k_apk_install_refresh";
-    private static final String BUNDLED_SYSTEM_PATCH_VERSION = "UT99_ANDROID_V166K_APK_INSTALL_UMENU_REFRESH_20260531";
+    private static final String BUNDLED_SYSTEM_PATCH_VERSION = "UT99_CONSOLE_MENU_20261014_1";
 
     private UT99Paths() {
     }
@@ -395,7 +395,7 @@ final class UT99Paths {
         // which was safe for menu rollout but wastes I/O every start. v161 keeps
         // the same safety on first run/new marker, then skips copying while the
         // installed marker and files are already current.
-        String[] patchPackages = {"UMenu.u", "UTMenu.u"};
+        String[] patchPackages = {"UMenu.u", "UTMenu.u", "UT99ConsoleMenu.u", "UT99ConsoleMenu.int", "UT99ConsoleMenu.frt"};
         File marker = new File(system, BUNDLED_SYSTEM_PATCH_MARKER);
         boolean markerCurrent = false;
         if (marker.isFile()) {
@@ -433,8 +433,8 @@ final class UT99Paths {
             }
 
             File target = new File(system, packageName);
-            boolean forceUMenuForApkInstall = apkInstallRefreshNeeded && "UMenu.u".equals(packageName);
-            if (!forceUMenuForApkInstall && markerCurrent && target.isFile() && target.length() > 0L) {
+            boolean forcePackageForApkInstall = apkInstallRefreshNeeded;
+            if (!forcePackageForApkInstall && markerCurrent && target.isFile() && target.length() > 0L) {
                 skippedCurrent++;
                 Log.i(TAG, "UT99_ANDROID_V166K_SYSTEM_PATCHES: current, skipped System/" + packageName + " size=" + target.length());
                 continue;
@@ -444,7 +444,7 @@ final class UT99Paths {
             copiedAny = true;
             Log.i(TAG, "UT99_ANDROID_V166K_SYSTEM_PATCHES: refreshed bundled System/" + packageName
                     + " size=" + target.length()
-                    + " forceApkInstall=" + forceUMenuForApkInstall);
+                    + " forceApkInstall=" + forcePackageForApkInstall);
         }
 
         if (copiedAny || !markerCurrent || !marker.isFile()) {
