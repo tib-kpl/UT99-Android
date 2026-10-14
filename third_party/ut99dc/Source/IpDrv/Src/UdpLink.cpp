@@ -95,7 +95,7 @@ static UBOOL AndroidLanClassContains( AUdpLink* Link, const TCHAR* Fragment )
 	return Link
 		&& Link->GetClass()
 		&& Fragment
-		&& appStrfind( Link->GetClass()->GetName(), Fragment ) != NULL;
+		&& appStrstr( Link->GetClass()->GetName(), Fragment ) != NULL;
 }
 
 static UBOOL AndroidLanClassLooksRelevant( AUdpLink* Link )
@@ -258,7 +258,7 @@ static void AndroidLanFanOutReportQuery( SOCKET Socket, INT ToPort, const FStrin
 	if( appStricmp( *Text, TEXT("REPORTQUERY") ) != 0 || ToPort <= 0 )
 		return;
 
-	INT Sends = AndroidLanSendToTargets( Socket, ToPort, Text, 1 );
+	INT Sends = AndroidLanSendToTargets( Socket, ToPort, Text, ToPort == 8777 );
 	AndroidLanLog( *FString::Printf( TEXT("UT99_ANDROID_V112_LAN SendText REPORTQUERY fanout sends=%i port=%i"), Sends, ToPort ) );
 }
 
@@ -320,8 +320,8 @@ static void AndroidLanRepeatTick( AUdpLink* Link )
 	{
 		if( AndroidLanRepeatDue( Link, 3.0 ) )
 		{
-			INT ReportSends = AndroidLanSendToTargetsPortRange( Link->GetSocket(), 8777, 20, TEXT("REPORTQUERY"), 1 );
-			INT InfoSends   = AndroidLanSendDirectInfoScan( Link->GetSocket() );
+			INT ReportSends = AndroidLanSendToTargetsPortRange( Link->GetSocket(), 8777, 20, TEXT("REPORTQUERY"), 0 );
+			INT InfoSends   = AndroidLanSendToTargetsPortRange( Link->GetSocket(), 7778, 10, TEXT("\\info\\"), 0 );
 			AndroidLanLog( *FString::Printf( TEXT("UT99_ANDROID_V112_LAN browser scan reportquery=%i info=%i ports=8777-8796/7777-7787"), ReportSends, InfoSends ) );
 		}
 		return;
@@ -403,7 +403,7 @@ void AUdpLink::Destroy()
 		closesocket(GetSocket());
 	GetSocket() = INVALID_SOCKET;
 #else
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 		closesocket(GetSocket());
 #endif
 	Super::Destroy();
@@ -419,6 +419,17 @@ void AUdpLink::execBindPort( FFrame& Stack, RESULT_DECL )
 	P_GET_INT_OPTX(InPort,0);
 	P_GET_UBOOL_OPTX(bUseNextAvailable,0);
 	P_FINISH;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+    // Retail script defaults can overwrite the constructor's -1 with zero.
+    // Android reserves descriptors 0..2; zero is not an already-bound socket.
+    if(GetSocket() == 0) GetSocket() = INVALID_SOCKET;
+    // Stock discovery/query scripts handle ReceivedText and never call ReadText.
+    // Their retail defaults can also overwrite the native event-receive mode.
+    if(AndroidLanClassContains(this, TEXT("Browser")) || AndroidLanClassContains(this, TEXT("Beacon")))
+    {
+        ReceiveMode = RMODE_Event;
+    }
+#endif
 	if( GInitialized )
 	{
 		if( GetSocket()==INVALID_SOCKET )
@@ -469,7 +480,7 @@ void AUdpLink::execBindPort( FFrame& Stack, RESULT_DECL )
 			}
 			else Stack.Logf( TEXT("BindPort: socket failed") );
 			closesocket(GetSocket());
-			GetSocket()=0;
+			GetSocket()=INVALID_SOCKET;
 		}
 		else Stack.Logf( TEXT("BindPort: already bound") );
 	}
@@ -487,7 +498,7 @@ void AUdpLink::execSendText( FFrame& Stack, RESULT_DECL )
 	P_GET_STRUCT(FIpAddr,IpAddr);
 	P_GET_STR(Str);
 	P_FINISH;
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		sockaddr_in Addr;
 		Addr.sin_family      = AF_INET;
@@ -522,7 +533,7 @@ void AUdpLink::execSendBinary( FFrame& Stack, RESULT_DECL )
 	P_GET_INT(Count);
 	P_GET_ARRAY_REF(BYTE,B);
 	P_FINISH;
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		sockaddr_in Addr;
 		Addr.sin_family      = AF_INET;
@@ -546,7 +557,7 @@ UBOOL AUdpLink::Tick( FLOAT DeltaTime, enum ELevelTick TickType )
 {
 	guard(AUdpLink::Tick);
 	UBOOL Result = Super::Tick( DeltaTime, TickType );
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		if( ReceiveMode == RMODE_Event )
 		{
@@ -628,7 +639,7 @@ void AUdpLink::execReadText( FFrame& Stack, RESULT_DECL )
 	P_GET_STR_REF( Str );
 	P_FINISH;
 	*Str = TEXT("");
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		BYTE Buffer[MAXRECVDATASIZE];
 		sockaddr_in FromAddr;
@@ -665,7 +676,7 @@ void AUdpLink::execReadBinary( FFrame& Stack, RESULT_DECL )
 	P_GET_INT(Count);
 	P_GET_ARRAY_REF(BYTE,B);
 	P_FINISH;
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		sockaddr_in FromAddr;
 		socklen_t FromSize = sizeof(FromAddr);

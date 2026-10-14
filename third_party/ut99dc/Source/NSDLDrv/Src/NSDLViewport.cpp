@@ -1489,6 +1489,8 @@ static void UT99V72QueueStartToggle( const char* Reason )
 }
 
 static UBOOL UT99ConsoleMenuHandleStart( UNSDLViewport* Viewport );
+static UBOOL UT99ConsoleMenuHandleBack( UNSDLViewport* Viewport );
+static INT GUT99ConsoleMenuBackRequests = 0;
 
 static void UT99V72PumpStartToggle( UNSDLViewport* Viewport, UBOOL bMenu )
 {
@@ -1728,6 +1730,11 @@ static void UT99V47TickInput( UNSDLViewport* Viewport, UBOOL bMenu )
     GUT99V80StartFallbackTime = 0.0;
     GUT99V80StartFallbackExpire = 0.0;
     UT99V72PumpStartToggle( Viewport, bMenu );
+    if(GUT99ConsoleMenuBackRequests)
+    {
+        GUT99ConsoleMenuBackRequests = 0;
+        if(bMenu) UT99ConsoleMenuHandleBack(Viewport);
+    }
 #endif
 
     if( bMenu )
@@ -1863,6 +1870,20 @@ if( !GUT99V47BtnStart )
 
 static void UT99V47SetAndroidButton( INT KeyCode, UBOOL Down )
 {
+    // Preserve every menu D-pad press, including down/up pairs between frames.
+    // Java owns these key events; SDL's thread-safe queue keeps their order.
+    if(GUT99AndroidMenuVisibleV91 && !GUT99AndroidImeOpenV79 && ((KeyCode >= 19 && KeyCode <= 22) || KeyCode == 96))
+    {
+        if(Down)
+        {
+            SDL_Event Event;
+            SDL_memset(&Event, 0, sizeof(Event));
+            Event.type = SDL_USEREVENT + 0x211;
+            Event.user.code = KeyCode;
+            SDL_PushEvent(&Event);
+        }
+        return;
+    }
     if( Down && (KeyCode == 67 || KeyCode == 112) ) // KEYCODE_DEL / KEYCODE_FORWARD_DEL
     {
         ++GUT99V80QueuedBackspace;
@@ -1888,6 +1909,7 @@ static void UT99V47SetAndroidButton( INT KeyCode, UBOOL Down )
         GUT99V47QueuedStartRelease = 0;
     }
 
+    if(KeyCode == 97 && Down && !GUT99V47BtnB) ++GUT99ConsoleMenuBackRequests;
     UT99V49SetAndroidButtonExtra( KeyCode, Down );
     switch( KeyCode )
     {
@@ -1998,7 +2020,6 @@ static UBOOL GUT99V46Left = 0;
 static UBOOL GUT99V46Right = 0;
 static UBOOL GUT99V46Fire = 0;
 static UBOOL GUT99V46AltFire = 0;
-static DOUBLE GUT99V46MenuLast[32] = {0};
 static DOUBLE GUT99V46LastLookLog = 0.0;
 
 static INT UT99V46AbsI( INT V ) { return V < 0 ? -V : V; }
@@ -2032,22 +2053,13 @@ static UBOOL UT99V46MenuButton( UNSDLViewport* Viewport, INT Button, UBOOL Down 
         case SDL_CONTROLLER_BUTTON_DPAD_LEFT:  Key = 37; break;
         case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: Key = 39; break;
         case SDL_CONTROLLER_BUTTON_A: Key = 13; break;
-        case SDL_CONTROLLER_BUTTON_B: return 1; // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120: B is bindable, not menu back.
+        case SDL_CONTROLLER_BUTTON_B: Key = IK_Joy2; break; // Scripted Back, or bind Joy2 while capturing.
         case SDL_CONTROLLER_BUTTON_START: Key = 27; break; // START opens/closes menu.
         case SDL_CONTROLLER_BUTTON_BACK: return 1; // SELECT must not open/close menu.
         default: return 0;
     }
 
-    if( Key == 37 || Key == 38 || Key == 39 || Key == 40 )
-    {
-        INT Index = Button;
-        if( Index < 0 || Index >= 32 ) Index = 31;
-        DOUBLE Now = appSeconds();
-        if( GUT99V46MenuLast[Index] > 0.0 && (Now - GUT99V46MenuLast[Index]) < 0.24 )
-            return 1;
-        GUT99V46MenuLast[Index] = Now;
-    }
-
+    // Each SDL button-down is a separate physical press, not a held-state poll.
     UT99V46Event( Viewport, Key, IST_Press );
     UT99V46Event( Viewport, Key, IST_Release );
     UT99_ANDROID_SDL_LOGI( "v46 menu button=%d -> key=%d", Button, Key );
@@ -2181,7 +2193,7 @@ static INT UT99AndroidMenuButtonToKeyV43( INT Button )
         case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: return 39; // IK_Right
         case SDL_CONTROLLER_BUTTON_DPAD_DOWN:  return 40; // IK_Down
         case SDL_CONTROLLER_BUTTON_A:          return 13; // IK_Enter
-        case SDL_CONTROLLER_BUTTON_B:          return 0;  // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120: B is bindable, not menu back
+        case SDL_CONTROLLER_BUTTON_B:          return IK_Joy2; // Scripted Back / key capture
         case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return 1; // IK_LeftMouse / v88 menu click
         case SDL_CONTROLLER_BUTTON_BACK:       return 0;  // v72: SELECT ignored
         case SDL_CONTROLLER_BUTTON_START:      return 0;  // v72: START handled by single-toggle queue
@@ -2195,7 +2207,7 @@ static INT UT99AndroidMenuButtonToKeyV43( INT Button )
         case 14: return 39; // right
         case 12: return 40; // down
         case 0:  return 13; // A / Enter
-        case 1:  return 0;  // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120: B is bindable, not menu back
+        case 1:  return IK_Joy2; // Scripted Back / key capture
         case 4:  return 0;  // v72: Back-like/Select ignored
         case 6:  return 0;  // v72: raw Start handled by single-toggle queue
     }
@@ -2241,7 +2253,7 @@ static UBOOL UT99AndroidMenuControllerButtonV43( UNSDLViewport* Viewport, INT Bu
         return 1;
     }
 
-    if( !UT99AndroidMenuButtonDebounceV43( Button ) )
+    if( (Key < 37 || Key > 40) && !UT99AndroidMenuButtonDebounceV43( Button ) )
     {
         UT99_ANDROID_SDL_LOGI( "v43 debounced menu button=%d key=%d", Button, Key );
         return 1;
@@ -2617,6 +2629,29 @@ static UBOOL UT99ConsoleMenuHandleStart( UNSDLViewport* Viewport )
     return Parms.ReturnValue;
 }
 
+static UBOOL UT99ConsoleMenuHandleBack( UNSDLViewport* Viewport )
+{
+    if(!Viewport || !Viewport->Console) return 0;
+    UObject* Root = UT99AndroidFindObjectPropertyV169E((UObject*)Viewport->Console, TEXT("Root"));
+    if(!Root) return 0;
+    UFunction* Handler = Root->FindFunction(FName(TEXT("HandleBackButton")), 0);
+    if(!Handler) return 0;
+    struct { UBOOL ReturnValue; } Parms = {0};
+    Root->ProcessEvent(Handler, &Parms);
+    return Parms.ReturnValue;
+}
+
+static UBOOL UT99ConsoleMenuHandleCapturedKey(UNSDLViewport* Viewport, INT Key)
+{
+    UObject* Root = Viewport && Viewport->Console
+        ? UT99AndroidFindObjectPropertyV169E((UObject*)Viewport->Console, TEXT("Root")) : NULL;
+    UFunction* Handler = Root ? Root->FindFunction(FName(TEXT("HandleCapturedControllerKey")), 0) : NULL;
+    if(!Handler) return 0;
+    struct { INT Key; UBOOL ReturnValue; } Parms = {Key, 0};
+    Root->ProcessEvent(Handler, &Parms);
+    return Parms.ReturnValue;
+}
+
 static FLOAT UT99AndroidGetRootScaleV169E( UObject* Root )
 {
     if( !Root )
@@ -2676,6 +2711,17 @@ static UBOOL UT99AndroidUWindowMoveMouseV169E( UNSDLViewport* Viewport, INT Mous
     return 0;
 }
 
+static void UT99ConsoleMenuSetSyntheticHover(UNSDLViewport* Viewport, UBOOL Ignore)
+{
+    if(!Viewport || !Viewport->Console) return;
+    UObject* Root = UT99AndroidFindObjectPropertyV169E((UObject*)Viewport->Console, TEXT("Root"));
+    if(!Root) return;
+    UFunction* Handler = Root->FindFunction(FName(TEXT("SetSyntheticHover")), 0);
+    if(!Handler) return;
+    struct { UBOOL bIgnore; } Parms = {Ignore};
+    Root->ProcessEvent(Handler, &Parms);
+}
+
 static void UT99AndroidHideOrParkMenuPointerV169K( UNSDLViewport* Viewport, UBOOL bForcePark, const char* Source )
 {
     // UT99_ANDROID_V169K_TOUCH_IDLE_CURSOR_HIDE:
@@ -2701,7 +2747,9 @@ static void UT99AndroidHideOrParkMenuPointerV169K( UNSDLViewport* Viewport, UBOO
     Viewport->bWindowsMouseAvailable = 1;
     UT99AndroidSetWindowConsoleMouseV91( ParkX, ParkY );
     FLOAT UIX = 0.0f, UIY = 0.0f;
+    UT99ConsoleMenuSetSyntheticHover(Viewport, 1);
     UT99AndroidUWindowMoveMouseV169E( Viewport, ParkX, ParkY, &UIX, &UIY );
+    UT99ConsoleMenuSetSyntheticHover(Viewport, 0);
     SDL_ShowCursor( SDL_DISABLE );
 
     DOUBLE Now = appSeconds();
@@ -3301,7 +3349,7 @@ static INT UT99AndroidControllerButtonToUiKeyV28( Uint8 Button )
     switch( Button )
     {
         case SDL_CONTROLLER_BUTTON_A: return IK_Enter;
-        case SDL_CONTROLLER_BUTTON_B: return IK_None; // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120: B is bindable, not menu back
+        case SDL_CONTROLLER_BUTTON_B: return IK_Joy2; // Scripted Back / key capture
         case SDL_CONTROLLER_BUTTON_BACK: return IK_None;
         case SDL_CONTROLLER_BUTTON_START: return IK_None;
         case SDL_CONTROLLER_BUTTON_DPAD_UP: return IK_Up;
@@ -5399,6 +5447,21 @@ while( SDL_PollEvent( &Ev ) )
             }
 #endif
 #ifdef PLATFORM_ANDROID
+            case SDL_USEREVENT + 0x211:
+                if(GUT99AndroidMenuVisibleV91)
+                {
+                    const INT ArrowKeys[4] = {38, 40, 37, 39};
+                    const INT CaptureKeys[4] = {IK_JoyPovUp, IK_JoyPovDown, IK_JoyPovLeft, IK_JoyPovRight};
+                    const INT Direction = Ev.user.code - 19;
+                    if(Direction >= 0 && Direction < 4)
+                    {
+                        if(!UT99ConsoleMenuHandleCapturedKey(this, CaptureKeys[Direction]))
+                            UT99V49PulseKey(this, ArrowKeys[Direction]);
+                    }
+                    else if(Ev.user.code == 96 && !UT99ConsoleMenuHandleCapturedKey(this, IK_Joy1))
+                        UT99V49PulseKey(this, 13);
+                }
+                break;
             case SDL_USEREVENT + 0x210:
                 // UT99_ANDROID_CHROMEOS_MOUSE_FRAMEPACED_FLOAT_V210
                 if( Ev.user.code == GUT99AndroidHighResMouseMagicV210 )

@@ -5,6 +5,11 @@ var NotifyWindow CampaignWindow;
 var NewCharacterWindow Character;
 var ManagerWindow Manager;
 var UTLadder LevelScreen;
+var MeshBrowser Roster;
+var ObjectiveBrowser Objectives;
+var UMenuPlayerMeshClient PreviewMesh;
+var int PreviewRowIndex;
+var localized string StartMatchText, TeamOverviewText;
 var localized string CharacterLocation, TypesLocation, LevelsLocation, ContinueText, LockedText;
 var UWindowEditControl NameProxy;
 var bool bFinished;
@@ -20,12 +25,16 @@ function Created()
     Character = NewCharacterWindow(CampaignWindow);
     Manager = ManagerWindow(CampaignWindow);
     LevelScreen = UTLadder(CampaignWindow);
+    Roster = MeshBrowser(CampaignWindow);
+    Objectives = ObjectiveBrowser(CampaignWindow);
+    PreviewRowIndex = -1;
     CampaignWindow.HideWindow();
     SetAcceptsHotKeys(True);
     MenuFont = Font(DynamicLoadObject("UWindowFonts.UTFont40", class'Font'));
     if(Character != None)
     {
-        Character.MeshWindow.SetParent(Self);
+        PreviewMesh = Character.MeshWindow;
+        PreviewMesh.SetParent(Self);
         NameProxy = UWindowEditControl(CreateWindow(class'UWindowEditControl', 0, 0, 1, 1));
         NameProxy.SetText(Character.NameText);
         NameProxy.SetValue(Character.NameEdit.GetValue());
@@ -37,6 +46,19 @@ function Created()
     if(LevelScreen != None)
     {
         DetailArea = LevelScreen.MapInfoArea;
+        DetailArea.SetParent(Self);
+    }
+    if(Roster != None)
+    {
+        PreviewMesh = Roster.MeshWindow;
+        PreviewMesh.SetParent(Self);
+        DetailArea = Roster.DescArea;
+        DetailArea.SetParent(Self);
+        NoPreviewText = "";
+    }
+    if(Objectives != None)
+    {
+        DetailArea = Objectives.ObjDescArea;
         DetailArea.SetParent(Self);
     }
     BuildList();
@@ -93,6 +115,17 @@ function BuildList()
         Controls[Count++] = Manager.ChallengeLadderButton;
         Controls[Count++] = Manager.TrophyButton;
     }
+    else if(Roster != None)
+    {
+        for(i = 0; i < Roster.NumNames; i++) Controls[Count++] = Roster.Names[i];
+        Controls[Count++] = Roster.Title1;
+        Controls[Count++] = Roster.NextButton;
+    }
+    else if(Objectives != None)
+    {
+        for(i = 0; i < Objectives.NumNames; i++) Controls[Count++] = Objectives.Names[i];
+        Controls[Count++] = Objectives.NextButton;
+    }
     else if(LevelScreen != None && LevelScreen.LadderObj != None)
         for(i = 0; i < LevelScreen.LadderObj.CurrentLadder.Default.Matches; i++)
             Controls[Count++] = LevelScreen.Matches[i];
@@ -129,6 +162,17 @@ function string Caption(int Index)
             if(Index == 4) S = Character.SkillsText$" : "$Character.SkillButton.Text;
             if(Index == 5) S = ContinueText;
         }
+        else if(Roster != None)
+        {
+            if(Controls[Index] == Roster.NextButton)
+            {
+                if(EnemyBrowser(Roster) != None) S = StartMatchText;
+                else S = ContinueText;
+            }
+            else if(Controls[Index] == Roster.Title1) S = TeamOverviewText;
+            else S = NotifyButton(Controls[Index]).Text;
+        }
+        else if(Objectives != None && Controls[Index] == Objectives.NextButton) S = ContinueText;
         else S = NotifyButton(Controls[Index]).Text;
         if(IsLocked(Index)) S = S$"  ["$LockedText$"]";
         return RemoveAmpersand(S);
@@ -145,6 +189,8 @@ function string GetLocation()
 {
     if(Character != None) return CampaignText$" / "$CharacterLocation;
     if(Manager != None) return CampaignText$" / "$TypesLocation;
+    if(Roster != None) return CampaignText$" / "$Roster.LadderWindow.LadderName$" / "$Roster.BrowserName;
+    if(Objectives != None) return CampaignText$" / "$Objectives.LadderWindow.LadderName$" / "$Objectives.BrowserName;
     return CampaignText$" / "$LevelScreen.LadderName$" / "$LevelsLocation;
 }
 
@@ -179,6 +225,20 @@ function BeforePaint(Canvas C, float X, float Y)
         PickerMapName = Caption(Row)$".unr";
     }
     else { PickerPicture = None; PickerMapName = ""; }
+    if(Roster != None && Row < Roster.NumNames && PreviewRowIndex != Row)
+    {
+        PreviewRowIndex = Row;
+        Roster.Notify(Roster.Names[Row], DE_Click);
+    }
+    if(Objectives != None)
+    {
+        if(Row < Objectives.NumNames && PreviewRowIndex != Row)
+        {
+            PreviewRowIndex = Row;
+            Objectives.NameSelected(Row);
+        }
+        PickerPicture = Objectives.MapShot;
+    }
     if(DetailArea != None)
     {
         DetailArea.WinLeft = WinWidth*0.54;
@@ -187,12 +247,13 @@ function BeforePaint(Canvas C, float X, float Y)
         DetailArea.MyFont = Root.Fonts[F_Normal];
         DetailArea.bAutoScrolling = True;
     }
-    if(Character != None)
+    if(PreviewMesh != None)
     {
-        Character.MeshWindow.MeshActor.DrawScale = Character.MeshWindow.MeshActor.Default.DrawScale*0.50;
-        Character.MeshWindow.WinLeft = WinWidth*0.54;
-        Character.MeshWindow.WinTop = WinHeight*0.28;
-        Character.MeshWindow.SetSize(WinWidth*0.40, WinHeight*PreviewHeight);
+        if(!PreviewMesh.MeshActor.bMeshEnviroMap)
+            PreviewMesh.MeshActor.DrawScale = PreviewMesh.MeshActor.Default.DrawScale*0.50;
+        PreviewMesh.WinLeft = WinWidth*0.54;
+        PreviewMesh.WinTop = WinHeight*0.28;
+        PreviewMesh.SetSize(WinWidth*0.40, WinHeight*PreviewHeight);
     }
 }
 
@@ -240,6 +301,23 @@ function ActivateRow()
         if(B == Manager.TrophyButton) Manager.Notify(B, DE_Click);
         else Manager.Notify(B, DE_DoubleClick);
     }
+    else if(Roster != None)
+    {
+        if(B == Roster.NextButton)
+        {
+            RestorePanels(); bFinished = True; HideWindow();
+        }
+        Roster.Notify(B, DE_Click);
+    }
+    else if(Objectives != None)
+    {
+        if(B == Objectives.NextButton)
+        {
+            RestorePanels(); bFinished = True; HideWindow();
+            Objectives.NextPressed();
+        }
+        else Objectives.Notify(B, DE_Click);
+    }
     else if(LevelScreen != None)
     {
         if(DetailArea != None) DetailArea.SetParent(LevelScreen);
@@ -255,6 +333,12 @@ function ChangeValue(int Direction)
     else Super.ChangeValue(Direction);
 }
 
+function RestorePanels()
+{
+    if(PreviewMesh != None) PreviewMesh.SetParent(CampaignWindow);
+    if(DetailArea != None) DetailArea.SetParent(CampaignWindow);
+}
+
 function GoBack()
 {
     if(InputField != None || Picker != None) { Super.GoBack(); return; }
@@ -266,6 +350,14 @@ function GoBack()
         Character.BackPressed();
     }
     else if(Manager != None) Manager.Close();
+    else if(Roster != None)
+    {
+        RestorePanels(); Roster.BackPressed();
+    }
+    else if(Objectives != None)
+    {
+        RestorePanels(); Objectives.BackPressed();
+    }
     else
     {
         if(DetailArea != None) DetailArea.SetParent(LevelScreen);
@@ -281,6 +373,8 @@ defaultproperties
     TypesLocation="GAME TYPES"
     LevelsLocation="LEVELS"
     ContinueText="CONTINUE"
+    StartMatchText="START MATCH"
+    TeamOverviewText="TEAM OVERVIEW"
     LockedText="LOCKED"
     UnlockText="UNLOCKED"
     MapPickerHint="UP/DOWN: select   ENTER / A: play   ESC / B: back"

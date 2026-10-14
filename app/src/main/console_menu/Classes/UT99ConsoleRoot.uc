@@ -9,6 +9,16 @@ var Texture MapBackdrop;
 var string BackdropMapName;
 var bool bLoggedGameplayMenu;
 var UT99ConsoleCampaign CampaignScreen;
+var UT99ConsoleSaves SavesScreen;
+var bool bOpenHomeAfterTravel;
+var UT99ConsoleDialog DialogScreen;
+var float NavigationClock, NextBackTime;
+var bool bIgnoreSyntheticHover;
+
+function SetSyntheticHover(bool bIgnore)
+{
+    bIgnoreSyntheticHover = bIgnore;
+}
 
 function bool IsGameplayMenu()
 {
@@ -31,9 +41,60 @@ function ResetHome()
     Home.BuildList();
 }
 
+function LeaveGame()
+{
+    ResetHome();
+    bOpenHomeAfterTravel = True;
+    Console.bLocked = False;
+    Console.CloseUWindow();
+    GetPlayerOwner().ClientTravel("UT-Logo-Map.unr?Game=Botpack.UTIntro", TRAVEL_Absolute, False);
+}
+
+function NotifyAfterLevelChange()
+{
+    Super.NotifyAfterLevelChange();
+    if(bOpenHomeAfterTravel && Left(GetLevel().GetLocalURL(), 11) ~= "UT-Logo-Map")
+    {
+        bOpenHomeAfterTravel = False;
+        ResetHome();
+        Console.bLocked = False;
+        Console.bQuickKeyEnable = False;
+        Console.LaunchUWindow();
+        MenuBar.HideWindow();
+        Home.ShowWindow(); Home.FocusWindow();
+    }
+}
+
+function bool HandleCapturedControllerKey(int Key)
+{
+    if(DialogScreen == None || !DialogScreen.bWindowVisible || DialogScreen.BindingOwner == None || !DialogScreen.BindingOwner.bPolling) return False;
+    DialogScreen.BindingOwner.KeyDown(Key, 0, 0);
+    DialogScreen.BindingOwner = None;
+    DialogScreen.FocusWindow(); DialogScreen.BuildList();
+    return True;
+}
+
+// Shared debounce covers Android key and SDL joystick duplicates.
+function bool HandleBackButton()
+{
+    if(!Console.bUWindowActive || Console.bQuickKeyEnable) return False;
+    if(NavigationClock < NextBackTime) return True;
+    NextBackTime = NavigationClock+0.20;
+    if(DialogScreen != None && DialogScreen.bWindowVisible && DialogScreen.BindingOwner != None && DialogScreen.BindingOwner.bPolling)
+    {
+        DialogScreen.BindingOwner.KeyDown(0xC9, 0, 0);
+        DialogScreen.BindingOwner = None;
+        DialogScreen.BuildList();
+    }
+    else CloseActiveWindow();
+    return True;
+}
+
 // Called by the native Start queue, separately from Escape / B navigation.
 function bool HandleStartButton()
 {
+    local UWindowWindow W;
+    local int i;
     if(!IsGameplayMenu()) return False;
     if(!Console.bUWindowActive)
     {
@@ -42,6 +103,7 @@ function bool HandleStartButton()
         return False;
     }
     GetPlayerOwner().ConsoleCommand("ANDROID_HIDE_KEYBOARD");
+    while(DialogScreen != None && DialogScreen.bWindowVisible) DialogScreen.CloseForResume();
     if(ListsScreen != None && ListsScreen.bWindowVisible)
     {
         ListsScreen.NativeWindow.Close();
@@ -53,6 +115,14 @@ function bool HandleStartButton()
     {
         MatchScreen.NativeWindow.Close();
         MatchScreen.Close(True);
+    }
+    // Closing a native confirmation may create a follow-up notification.
+    for(i = 0; i < 16; i++)
+    {
+        for(W = LastChildWindow; W != None; W = W.PrevSiblingWindow)
+            if(UWindowFramedWindow(W) != None && W.bWindowVisible) break;
+        if(W == None) break;
+        W.Close();
     }
     ResetHome();
     MenuBar.CloseUp();
@@ -88,11 +158,18 @@ function ChooseMapBackdrop()
 
 function Created()
 {
+    local UMenuMultiplayerMenu M;
     Super.Created();
     ChooseMapBackdrop();
     MenuBar.bShowMenu = False;
     MenuBar.CloseUp();
     MenuBar.HideWindow();
+    M = UMenuMultiplayerMenu(MenuBar.Multiplayer);
+    if(M != None)
+    {
+        if(M.LAN == None) M.LAN = M.AddMenuItem("LAN", None);
+        if(M.Browser == None) M.Browser = M.AddMenuItem("Internet", None);
+    }
     Home = UT99ConsoleHome(CreateWindow(class'UT99ConsoleHome', 0, 0, WinWidth, WinHeight));
     Home.FocusWindow();
 }
@@ -108,6 +185,10 @@ function Resized()
         ListsScreen.SetSize(WinWidth, WinHeight);
     if(CampaignScreen != None)
         CampaignScreen.SetSize(WinWidth, WinHeight);
+    if(SavesScreen != None)
+        SavesScreen.SetSize(WinWidth, WinHeight);
+    if(DialogScreen != None)
+        DialogScreen.SetSize(WinWidth, WinHeight);
 }
 
 function bool HasDialog()
@@ -126,8 +207,9 @@ function Tick(float Delta)
 {
     local UMenuBotmatchWindow MatchWindow;
     local UWindowFramedWindow ListWindow;
-    local UWindowWindow CampaignWindow;
+    local UWindowWindow CampaignWindow, W;
     Super.Tick(Delta);
+    NavigationClock += Delta;
     if(IsGameplayMenu())
     {
         Console.bNoDrawWorld = False;
@@ -155,12 +237,17 @@ function Tick(float Delta)
     CampaignWindow = FindChildWindow(class'NewCharacterWindow');
     if(CampaignWindow == None || !CampaignWindow.bWindowVisible) CampaignWindow = FindChildWindow(class'ManagerWindow');
     if(CampaignWindow == None || !CampaignWindow.bWindowVisible) CampaignWindow = FindChildWindow(class'UTLadder');
+    if(CampaignWindow == None || !CampaignWindow.bWindowVisible) CampaignWindow = FindChildWindow(class'MeshBrowser');
+    if(CampaignWindow == None || !CampaignWindow.bWindowVisible) CampaignWindow = FindChildWindow(class'ObjectiveBrowser');
     if(CampaignWindow != None && CampaignWindow.bWindowVisible)
     {
         if(CampaignScreen != None) CampaignScreen.HideWindow();
         CampaignScreen = UT99ConsoleCampaign(CreateWindow(class'UT99ConsoleCampaign', 0, 0, WinWidth, WinHeight, CampaignWindow));
         MenuBar.HideWindow();
     }
+    CampaignWindow = FindChildWindow(class'SlotWindow');
+    if(CampaignWindow != None && CampaignWindow.bWindowVisible)
+        SavesScreen = UT99ConsoleSaves(CreateWindow(class'UT99ConsoleSaves', 0, 0, WinWidth, WinHeight, CampaignWindow));
     MatchWindow = UMenuBotmatchWindow(FindChildWindow(class'UMenuBotmatchWindow'));
     if(MatchWindow != None && MatchWindow.bWindowVisible && !Console.bLocked)
     {
@@ -175,6 +262,17 @@ function Tick(float Delta)
         if(ListWindow != None && ListWindow.bWindowVisible)
             ListsScreen = UT99ConsoleLists(CreateWindow(class'UT99ConsoleLists', 0, 0, WinWidth, WinHeight, ListWindow));
     }
+    // Any remaining framed screen gets the same header and navigation. Complex
+    // server/console panels are clipped into the new frame, retaining their logic.
+    for(W = FirstChildWindow; W != None; W = W.NextSiblingWindow)
+        if(UWindowFramedWindow(W) != None && W.bWindowVisible && W != MenuBar)
+        {
+            if(W.IsA('UBrowserMainWindow'))
+                DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleServers', 0, 0, WinWidth, WinHeight, W));
+            else
+                DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleDialog', 0, 0, WinWidth, WinHeight, W));
+            break;
+        }
     if(HasDialog() || Console.bQuickKeyEnable || Console.bLocked)
     {
         if(Home.bWindowVisible)
@@ -192,7 +290,8 @@ function Tick(float Delta)
         MenuBar.HideWindow();
         Home.ShowWindow();
         Home.FocusWindow();
-    }
+    }    if(DialogScreen != None && DialogScreen.bWindowVisible) MenuBar.HideWindow();
+
 }
 
 function Paint(Canvas C, float X, float Y)
@@ -245,7 +344,11 @@ function Paint(Canvas C, float X, float Y)
 
 function CloseActiveWindow()
 {
-    if(CampaignScreen != None && CampaignScreen.bWindowVisible)
+    if(DialogScreen != None && DialogScreen.bWindowVisible)
+        DialogScreen.GoBack();
+    else if(SavesScreen != None && SavesScreen.bWindowVisible)
+        SavesScreen.GoBack();
+    else if(CampaignScreen != None && CampaignScreen.bWindowVisible)
         CampaignScreen.GoBack();
     else if(ListsScreen != None && ListsScreen.bWindowVisible)
         ListsScreen.GoBack();

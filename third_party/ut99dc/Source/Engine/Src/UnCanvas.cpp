@@ -469,6 +469,13 @@ static inline INT DrawString
 				INT CV     = Char.StartV;
 				INT CUSize = CharWidth;
 				INT CVSize = Char.VSize;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+                // The retail UTFont40 'i' rectangle includes column 206 of
+                // Texture28: the neighbouring 'j' descender. Keep its advance,
+                // but exclude that final column from the drawing rectangle.
+                if(Ch == 'i' && appStricmp(Font->GetName(), TEXT("UTFont40")) == 0)
+                    CUSize = Max(0, CUSize-1);
+#endif
 
 				// Draw if it passes clip test.
 				if

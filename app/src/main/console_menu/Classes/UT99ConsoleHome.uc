@@ -15,6 +15,7 @@ var Font MenuFont;
 var bool bScrollDrag;
 var int LeaveRow;
 var localized string ResumeText, LeaveText, MainLocation, PauseLocation;
+var localized string LANMenuText, InternetMenuText, AddressMenuText;
 
 function string PageName(UWindowPulldownMenu P)
 {
@@ -44,6 +45,10 @@ function DrawLocation(Canvas C, float Y)
     C.Font = Root.Fonts[F_Bold];
     C.DrawColor.R = 230; C.DrawColor.G = 174; C.DrawColor.B = 66;
     TextSize(C, S, W, H);
+    if(W > WinWidth-16)
+    {
+        C.Font = Root.Fonts[F_Normal]; TextSize(C, S, W, H);
+    }
     ClipText(C, FMax(8, (WinWidth-W)*0.5), Y, S);
 }
 
@@ -72,16 +77,24 @@ function BuildList()
 {
     local UWindowList I;
     local int j;
+    local UMenuMultiplayerMenu M;
     for(j = 0; j < 512; j++)
         Entries[j] = None;
     Count = 0;
+    M = UMenuMultiplayerMenu(Page);
+    if(M != None)
+    {
+        if(M.LAN != None) Entries[Count++] = M.LAN;
+        if(M.Browser != None) Entries[Count++] = M.Browser;
+    }
     if(Page == None)
         I = UT99ConsoleRoot(Root).MenuBar.Items.Next;
     else
         I = Page.Items.Next;
     while(I != None && Count < 511)
     {
-        if(Page == None || UWindowPulldownMenuItem(I).Caption != "-")
+        if((Page == None || UWindowPulldownMenuItem(I).Caption != "-") &&
+           (M == None || (I != M.LAN && I != M.Browser)))
             Entries[Count++] = I;
         I = I.Next;
     }
@@ -105,6 +118,7 @@ function BeforePaint(Canvas C, float X, float Y)
 function string Caption(int Index)
 {
     local string S;
+    local UMenuMultiplayerMenu M;
     if(Index == Count-1)
     {
         if(Page == None && UT99ConsoleRoot(Root).IsGameplayMenu()) return ResumeText;
@@ -119,6 +133,13 @@ function string Caption(int Index)
     }
     else
     {
+        M = UMenuMultiplayerMenu(Page);
+        if(M != None)
+        {
+            if(Entries[Index] == M.LAN) return LANMenuText;
+            if(Entries[Index] == M.Browser) return InternetMenuText;
+            if(Entries[Index] == M.OpenLocation) return AddressMenuText;
+        }
         S = UWindowPulldownMenuItem(Entries[Index]).Caption;
         if(UWindowPulldownMenuItem(Entries[Index]).bChecked) S = "[+] "$S;
         if(UWindowPulldownMenuItem(Entries[Index]).SubMenu != None) S = S$"  >";
@@ -137,6 +158,7 @@ function Paint(Canvas C, float X, float Y)
     C.DrawColor.R = 255; C.DrawColor.G = 255; C.DrawColor.B = 255;
     DrawStretchedTexture(C, LogoX, WinHeight*0.02, LogoW, LogoW*0.5, Texture'UT99Logo');
     C.Style = 1;
+    C.bNoSmooth = True;
     DrawLocation(C, WinHeight*0.35);
     C.Font = MenuFont;
     if(C.Font == None) C.Font = Root.Fonts[F_LargeBold];
@@ -157,6 +179,7 @@ function Paint(Canvas C, float X, float Y)
         if(i == Row)
         { C.DrawColor.R = 255; C.DrawColor.G = 208; C.DrawColor.B = 100; }
         S = Caption(i);
+        FitRowFont(C, S, Width-20);
         TextSize(C, S, TextW, TextH);
         ClipText(C, MenuLeft+(Width-TextW)*0.5, YPos+(RowHeight-TextH)*0.5, S);
     }
@@ -166,6 +189,19 @@ function Paint(Canvas C, float X, float Y)
     C.DrawColor.R = 160; C.DrawColor.G = 160; C.DrawColor.B = 165;
     TextSize(C, HintText, TextW, TextH);
     ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, HintText);
+}
+
+function FitRowFont(Canvas C, string S, float AvailableWidth)
+{
+    local float W, H;
+    C.Font = MenuFont;
+    if(C.Font == None) C.Font = Root.Fonts[F_LargeBold];
+    TextSize(C, S, W, H);
+    if(W > AvailableWidth)
+    {
+        C.Font = Root.Fonts[F_LargeBold]; TextSize(C, S, W, H);
+        if(W > AvailableWidth) C.Font = Root.Fonts[F_Bold];
+    }
 }
 
 function DrawScrollIndicator(Canvas C)
@@ -200,6 +236,7 @@ function OpenPage(UWindowPulldownMenu NextPage)
 function ActivateRow()
 {
     local UWindowPulldownMenuItem I;
+    local UMenuMultiplayerMenu M;
     if(Count == 0) return;
     // Older controller paths emit Enter and a synthetic click in the same tick.
     if(bActionThisTick || UIClock < NextActionTime) return;
@@ -208,9 +245,7 @@ function ActivateRow()
     if(Row == Count-1) { GoBack(); return; }
     if(Row == LeaveRow)
     {
-        UT99ConsoleRoot(Root).ResetHome();
-        Root.Console.CloseUWindow();
-        GetPlayerOwner().ClientTravel("UT-Logo-Map.unr?Game=Botpack.UTIntro", TRAVEL_Absolute, False);
+        UT99ConsoleRoot(Root).LeaveGame();
         return;
     }
     LookAndFeel.PlayMenuSound(Self, MS_MenuPullDown);
@@ -224,6 +259,14 @@ function ActivateRow()
             OpenPage(I.SubMenu);
         else
         {
+            M = UMenuMultiplayerMenu(Page);
+            if(M != None && (I == M.LAN || I == M.Browser || I == M.OpenLocation))
+            {
+                M.bOpenLAN = I == M.LAN;
+                M.bOpenLocation = I == M.OpenLocation;
+                M.LoadUBrowser();
+                return;
+            }
             Page.BeforeExecuteItem(I);
             Page.ExecuteItem(I);
             BuildList();
@@ -256,7 +299,7 @@ function bool HotKeyDown(int Key, float X, float Y)
         case 0x27: ActivateRow(); return True;
         case 0x25: GoBack(); return True;
         case 0x08: GoBack(); return True;
-        case 0xC9: GoBack(); return True; // Joy2 / B, only while this home is visible.
+        case 0xC9: return UT99ConsoleRoot(Root).HandleBackButton(); // Joy2 / B, only while this home is visible.
     }
     return False;
 }
@@ -264,6 +307,7 @@ function bool HotKeyDown(int Key, float X, float Y)
 function MouseMove(float X, float Y)
 {
     local int Index;
+    if(UT99ConsoleRoot(Root).bIgnoreSyntheticHover) return;
     if(bScrollDrag)
     {
         Row = Clamp(int((Y-Top)*Count/(VisibleRows*RowHeight)), 0, Count-1);
@@ -310,6 +354,9 @@ function Close(optional bool bByParent)
 
 defaultproperties
 {
+    LANMenuText="LAN GAMES"
+    InternetMenuText="INTERNET GAMES"
+    AddressMenuText="JOIN BY SERVER ADDRESS"
     BackText="BACK"
     ResumeText="RESUME GAME"
     LeaveText="LEAVE GAME"

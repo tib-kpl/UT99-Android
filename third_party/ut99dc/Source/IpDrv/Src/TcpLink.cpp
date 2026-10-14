@@ -84,6 +84,10 @@ void ATcpLink::execBindPort( FFrame& Stack, RESULT_DECL )
 	P_GET_INT_OPTX(InPort,0);
 	P_GET_UBOOL_OPTX(bUseNextAvailable,0);
 	P_FINISH;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+    if(GetSocket() == 0) GetSocket() = INVALID_SOCKET;
+    if(RemoteSocket == 0) RemoteSocket = INVALID_SOCKET;
+#endif
 	LINGER ling;
 
 	if( GInitialized )
@@ -124,7 +128,7 @@ void ATcpLink::execBindPort( FFrame& Stack, RESULT_DECL )
 			}
 			else Stack.Logf( TEXT("BindPort: socket failed") );
 			closesocket(GetSocket());
-			GetSocket()=0;
+			GetSocket()=INVALID_SOCKET;
 		}
 		else Stack.Logf( TEXT("BindPort: already bound") );
 	}
@@ -151,7 +155,7 @@ void ATcpLink::execIsConnected( FFrame& Stack, RESULT_DECL )
 		return;
 	}
 	
-	if ( (LinkState == STATE_Listening) && GetSocket() )
+	if ( (LinkState == STATE_Listening) && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		FD_ZERO( &SocketSet );
 		FD_SET( RemoteSocket, &SocketSet );
@@ -186,7 +190,7 @@ void ATcpLink::execListen( FFrame& Stack, RESULT_DECL )
 	P_FINISH;
 
 	INT Error;
-	if ( GInitialized && GetSocket() )
+	if ( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		if( LinkState != STATE_ListenClosing )
 		{
@@ -221,7 +225,7 @@ UBOOL ATcpLink::Tick( FLOAT DeltaTime, enum ELevelTick TickType )
 	guard(ATcpLink::Tick);
 	UBOOL Result = Super::Tick( DeltaTime, TickType );
 
-	if( GetSocket() )
+	if( GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		switch( LinkState )
 		{
@@ -485,14 +489,18 @@ void ATcpLink::execOpen( FFrame& Stack, RESULT_DECL )
 	SOCKADDR_IN RemoteHost;
 	INT Error;
 
-	if ( GInitialized && GetSocket() )
+	if ( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		RemoteHost.sin_family      = AF_INET;
 		RemoteHost.sin_port		   = htons(Addr.Port);
 		RemoteHost.sin_addr.s_addr = htonl(Addr.Addr);
 		Error = connect( GetSocket(), (SOCKADDR*) &RemoteHost, sizeof(RemoteHost) );
 		if ( Error == SOCKET_ERROR ) {
-			if ( WSAGetLastError() != WSAEWOULDBLOCK ) {
+			if ( WSAGetLastError() != WSAEWOULDBLOCK
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+                && WSAGetLastError() != EINPROGRESS && WSAGetLastError() != EALREADY
+#endif
+            ) {
 				debugf(NAME_Log, TEXT("Open: An error occured while attempting to connect: %i"), WSAGetLastError());
 				*(DWORD*) Result = 0;
 				return;
@@ -554,7 +562,7 @@ void ATcpLink::execClose( FFrame& Stack, RESULT_DECL )
 	guard(ATcpLink::execClose);
 	P_FINISH;
 
-	if ( GInitialized && GetSocket() )
+	if ( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		if ( LinkState == STATE_Listening )
 		{
@@ -579,7 +587,7 @@ void ATcpLink::execClose( FFrame& Stack, RESULT_DECL )
 void ATcpLink::ShutdownConnection()
 {
 	guard(ATcpLink::ShutdownConnection);
-	if ( GInitialized && GetSocket() )
+	if ( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		INT Error = 0;
 		if( LinkState == STATE_ListenClosePending )
@@ -616,7 +624,7 @@ void ATcpLink::execReadText( FFrame& Stack, RESULT_DECL )
 	P_FINISH;
 
 	INT BytesReceived;
-	if( GInitialized && GetSocket() )
+	if( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		if( LinkState==STATE_Listening || LinkState==STATE_Connected )
 		{
@@ -681,7 +689,7 @@ void ATcpLink::execSendBinary( FFrame& Stack, RESULT_DECL )
 	P_GET_ARRAY_REF(BYTE,B);
 	P_FINISH;
 
-	if ( GInitialized && GetSocket() )
+	if ( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		INT Index = SendFIFO.Add( Count );
 		for(INT i=0; i < Count; i++)
@@ -707,7 +715,7 @@ void ATcpLink::execSendText( FFrame& Stack, RESULT_DECL )
 	P_FINISH;
 
 	*(DWORD*)Result = 0;
-	if( GInitialized && GetSocket() )
+	if( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		if( LinkMode == MODE_Line )
 			Str += TEXT("\r\n");
@@ -738,7 +746,7 @@ void ATcpLink::execReadBinary( FFrame& Stack, RESULT_DECL )
 
 	int BytesReceived;
 
-	if ( GInitialized && GetSocket() )
+	if ( GInitialized && GetSocket() != INVALID_SOCKET && GetSocket() != 0 )
 	{
 		if ( (LinkState == STATE_Listening) || (LinkState == STATE_Connected) )
 		{

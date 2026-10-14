@@ -121,7 +121,11 @@ function string Caption(int Index)
         else Value = DisabledText;
     }
     else if(UWindowHSliderControl(Control) != None)
-        Value = string(int(UWindowHSliderControl(Control).Value));
+    {
+        Value = string(UWindowHSliderControl(Control).Value);
+        while(InStr(Value, ".") != -1 && Right(Value, 1) == "0") Value = Left(Value, Len(Value)-1);
+        if(Right(Value, 1) == ".") Value = Left(Value, Len(Value)-1);
+    }
     else if(UWindowEditControl(Control) != None)
         Value = UWindowEditControl(Control).EditBox.GetValue();
     if(Value != "") return Label@"  <"@Value@">";
@@ -156,7 +160,10 @@ function ChangeValue(int Direction)
         Check.Notify(DE_Change);
     }
     else if(Slider != None)
-        Slider.SetValue(Slider.Value+Direction*Max(1, Slider.Step));
+    {
+        if(Slider.Step > 0) Slider.SetValue(Slider.Value+Direction*Slider.Step);
+        else Slider.SetValue(Slider.Value+Direction*FMax(0.01, (Slider.MaxValue-Slider.MinValue)/100));
+    }
     else if(Edit != None && Edit.EditBox.bCanEdit && Edit.EditBox.bNumericOnly && !Edit.EditBox.bNumericFloat)
     {
         Edit.SetValue(string(Max(0, int(Edit.EditBox.GetValue())+Direction)));
@@ -367,6 +374,7 @@ function PaintMapPicker(Canvas C)
         C.DrawColor.R = 225; C.DrawColor.G = 220; C.DrawColor.B = 205;
         if(i == Row) { C.DrawColor.R = 255; C.DrawColor.G = 208; C.DrawColor.B = 100; }
         S = Caption(i);
+        FitRowFont(C, S, Width-20);
         TextSize(C, S, TextW, TextH);
         ClipText(C, MenuLeft+12, YPos+(RowHeight-TextH)*0.5, S);
     }
