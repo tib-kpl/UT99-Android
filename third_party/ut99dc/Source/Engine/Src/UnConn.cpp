@@ -50,6 +50,16 @@ UNetConnection::UNetConnection( UNetDriver* InDriver, const FURL& InURL )
 
 	// Other parameters.
 	CurrentNetSpeed = URL.HasOption(TEXT("LAN")) ? GetDefault<UPlayer>()->ConfiguredLanSpeed : GetDefault<UPlayer>()->ConfiguredInternetSpeed;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	// Imported v400 configurations can omit Engine.Player's configured speeds.
+	// Zero never drains QueuedBytes, so the handshake succeeds but subsequent
+	// actor channels (inventory, replication info and other players) starve.
+	if( CurrentNetSpeed < 500 )
+	{
+		CurrentNetSpeed = URL.HasOption(TEXT("LAN")) ? 20000 : 10000;
+		debugf( NAME_Log, TEXT("Android: restored missing connection netspeed to %i"), CurrentNetSpeed );
+	}
+#endif
 
 	// Create package map.
 	PackageMap = new(this)UPackageMapLevel(this);

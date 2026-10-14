@@ -122,6 +122,18 @@ supérieure sont indiqués comme incompatibles ; le test distant a reçu
 
 ## Publication CI
 
+### Correctif LAN Android
+
+Les configurations anciennes peuvent laisser les débits `Engine.Player` à zéro.
+La connexion réussit alors, mais la file réseau ne se vide plus : les acteurs,
+les armes et les informations du HUD ne sont plus répliqués vers le client.
+Le moteur Android rétablit un débit de 20 000 en LAN et de 10 000 sur Internet
+si la valeur configurée est inférieure au minimum accepté de 500.
+Les valeurs configurées valides sont conservées. Le build ARM a réussi et
+le journal de l'Odin confirme le débit LAN de 20 000. Le test visuel entre
+deux consoles mises à jour reste à effectuer ; la tentative vers la Thor
+avec l'ancienne release a expiré pendant le chargement.
+
 Le workflow `.github/workflows/build.yml` publie les builds de `feat/console-menu`
 dans une préversion GitHub distincte, avec un tag `console-menu-<run>-<attempt>`
 et l'APK normal `UT99-Android-<version>-fr-console-menu-normal-release.apk`.
