@@ -72,6 +72,7 @@ function Created()
         bEmbedded = True; Count = 1;
         NativeHost = CreateWindow(class'UWindowWindow', 0, 0, 100, 100);
         NativeWindow.SetParent(NativeHost);
+        NativeWindow.ShowWindow();
     }
     else
     {
@@ -329,6 +330,7 @@ function ActivateRow()
     if(Weapons != None && Row == Count-2)
     {
         DetailReturnRow = Row; bDetailMode = True; Row = 0; FirstRow = 0;
+        WeaponDetails.bScrollable = True; WeaponDetails.ScrollLines = 0;
         WeaponPreview.HideWindow(); BuildList(); return;
     }
     if(Weapons != None && Entries[Row] != None && Picker == None)
@@ -391,6 +393,9 @@ function ChangeValue(int Direction)
 function bool HotKeyDown(int Key, float X, float Y)
 {
     if(!bWindowVisible) return False;
+    if(InputField == None && Picker == None && !bDetailMode && Weapons != None && Entries[Row] != None &&
+       (Key == 0x25 || Key == 0x27))
+    { ChangeValue(Key-0x26); return True; }
     if(InputField != None && EditComboTarget != None)
     {
         if(Key == 0x0D)
@@ -404,6 +409,8 @@ function bool HotKeyDown(int Key, float X, float Y)
     }
     if(bDetailMode && Key != 0xC9)
     {
+        if(Key == 0x26 || Key == 0x21) WeaponDetails.ScrollLines = Max(0, WeaponDetails.ScrollLines-1);
+        if(Key == 0x28 || Key == 0x22) WeaponDetails.ScrollLines = Min(WeaponDetails.MaxScrollLines, WeaponDetails.ScrollLines+1);
         if(Key == 0x0D || Key == 0x1B || Key == 0x25) GoBack();
         return True;
     }
@@ -456,7 +463,7 @@ function GoBack()
 {
     if(bDetailMode)
     {
-        bDetailMode = False; Row = DetailReturnRow; FirstRow = 0;
+        bDetailMode = False; Row = DetailReturnRow; FirstRow = 0; WeaponDetails.bScrollable = False;
         WeaponPreview.ShowWindow(); BuildList(); return;
     }
     if(BindingOwner != None && BindingOwner.bPolling)

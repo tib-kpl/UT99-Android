@@ -2,6 +2,11 @@
 
 Branche : `feat/console-menu`.
 
+Orientation obligatoire : paysage. Les activités de lancement et de jeu sont
+verrouillées en `landscape`, et le jeu réapplique ce verrouillage au démarrage.
+L'adaptation des menus cible les tailles et proportions d'écrans en paysage ;
+aucune mise en page portrait n'est prévue.
+
 Le menu utilise un logo détouré, une palette bordeaux/dorée et des captures de
 cartes installées choisies aléatoirement. Les sous-menus affichent leur chemin
 sous le logo. Retour figure dans la liste avec la même taille que les options.
@@ -30,9 +35,16 @@ et les descriptions originales sont conservés. Les raccourcis affichent leur
 valeur réelle et restent assignables à la manette. Les armes peuvent être
 réordonnées avec gauche/droite, avec une action pour lire leur description.
 
-Les panneaux complexes du navigateur de serveurs et de la console sont intégrés
-dans le nouveau cadre avec un grand Retour ; leurs contrôles internes restent
-natifs. La fenêtre de saisie d'adresse apparaît devant le navigateur, propose
+LAN, Internet et favoris partagent une page dédiée : nom, carte, joueurs et ping,
+dix serveurs par page. Gauche/droite change de page sans déplacer la sélection ;
+les boutons tactiles et le numéro de page restent visibles. Recherche, options
+et retour ont un texte légèrement doré pour les distinguer des serveurs.
+La recherche filtre le nom, la carte, le type et l'adresse ; les options offrent
+le tri par nom/ping/carte/joueurs et l'actualisation. Les détails d'un serveur
+conservent ses joueurs/règles, copie d'adresse, tests de ping et gestion des
+favoris (ajout, modification, suppression). Le navigateur avancé conserve les
+onglets et contrôles natifs ; News, Chat et console restent intégrés dans le
+nouveau cadre avec un grand Retour. La fenêtre de saisie d'adresse propose
 une saisie au clavier Android, l'historique et la validation d'origine. Le
 navigateur peut être fermé puis rouvert sans rester attaché à un cadre masqué.
 
@@ -75,13 +87,14 @@ ses données n'ont pas été remplacées. APK construit pour arm64-v8a et armeab
 | Cartes | Aperçu immédiat, Facing Worlds, rotation et lancement de CTF-Face hébergé |
 | Tournoi enregistré | Liste, reprise, choix du niveau, adversaire puis lancement |
 | Campagne | Personnage, verrouillages, équipes DOM/CTF, objectifs/équipes Assaut, Challenge |
-| Déblocages | Message et progression testés avec un profil temporaire déjà avancé |
+| Déblocages | Combat automatisé sur un profil temporaire : victoire en DM-Fractal, position 3 → 4, Domination déverrouillée et sauvegardée |
 | Suppression | Annulation, confirmation, fichier actualisé et emplacement vide après redémarrage ; autres emplacements inchangés |
 | Préférences | Sept rubriques et affichage des raccourcis ; annulation de capture |
 | Joueur | Modèle 3D et affichage correct de « APERÇU » |
-| Armes | Liste et aperçu restaurés lorsque les priorités enregistrées sont vides |
+| Armes | Liste/aperçu restaurés, échange gauche/droite et sauvegarde des priorités, description complète affichée |
 | Connexion | Boîte de réglage réseau, adresse/historique, saisie et retour au navigateur |
 | LAN | Découverte d'un serveur PC et connexion réelle sur DM-Deck16][ depuis l'Odin |
+| Liste Internet | Plus de 800 serveurs, cartes/places/pings, pagination directionnelle et tactile, recherche Morpheus et règles du serveur |
 | Retour multijoueur | Parties LAN → Retour → Multijoueur → Retour → Menu principal, vérifié sur Odin |
 | En partie | Préférences sur fond flouté, Start reprend puis rouvre la racine, B reprend |
 | Sortie de match | Retour direct au menu principal |
@@ -91,12 +104,27 @@ doit conserver les droits d'écriture pour l'application : un fichier en mode
 0644 appartenant à `shell` empêche les sauvegardes natives ; utiliser 0660 pour
 les fichiers de test injectés dans ce répertoire.
 
-Restent à valider : campagne complète avec une victoire réelle déclenchant un
-déblocage, connexion réussie à un serveur distant, réorganisation d'armes et
-lecture complète sur appareil, panneaux de mods, OUYA et autres résolutions.
-Le test d'un profil avancé ne valide pas toute la progression de la campagne.
+Restent à valider : campagne complète jusqu'au trophée final,
+connexion réussie à un serveur distant compatible, panneaux de mods,
+OUYA et autres résolutions en paysage.
+Le test de victoire automatisée valide la transition native et le déblocage,
+mais ne constitue pas une campagne complète jouée à la main. Le package de test
+et le profil temporaire ont été retirés de l'application après ce contrôle.
 
 Le navigateur utilise désormais une liste adaptée à la manette pour LAN,
 Internet et favoris. Les services News/Chat restent accessibles explicitement
 dans cette liste ; Retour ne passe plus par leurs catégories intermédiaires.
 La connexion LAN a été validée, contrairement à la connexion à un serveur distant.
+
+Le port utilise le moteur 400. Les serveurs annonçant une version minimale
+supérieure sont indiqués comme incompatibles ; le test distant a reçu
+`UPGRADE MINVER=433 VER=469`. Adapter le menu ne change pas le protocole du moteur.
+
+## Publication CI
+
+Le workflow `.github/workflows/build.yml` publie les builds de `feat/console-menu`
+dans une préversion GitHub distincte, avec un tag `console-menu-<run>-<attempt>`
+et l'APK normal `UT99-Android-<version>-fr-console-menu-normal-release.apk`.
+Il utilise les secrets de signature Android du dépôt, vérifie la signature et
+ne remplace pas la release principale « Latest ». Sans secrets, le fichier porte
+explicitement le suffixe `-unsigned` et nécessite une signature pour installation.

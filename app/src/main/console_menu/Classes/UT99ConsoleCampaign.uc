@@ -129,6 +129,7 @@ function BuildList()
     else if(LevelScreen != None && LevelScreen.LadderObj != None)
         for(i = 0; i < LevelScreen.LadderObj.CurrentLadder.Default.Matches; i++)
             Controls[Count++] = LevelScreen.Matches[i];
+    if(PreviewMesh != None) Controls[Count++] = PreviewMesh.FaceButton;
     Count++;
     Row = Clamp(Row, 0, Count-1);
 }
@@ -152,6 +153,7 @@ function string Caption(int Index)
 {
     local string S;
     if(Index == Count-1) return BackText;
+    if(PreviewMesh != None && Controls[Index] == PreviewMesh.FaceButton) return class'UT99ConsoleDialog'.Default.PreviewFaceText;
     if(NotifyButton(Controls[Index]) != None)
     {
         if(Character != None)
@@ -254,6 +256,7 @@ function BeforePaint(Canvas C, float X, float Y)
         PreviewMesh.WinLeft = WinWidth*0.54;
         PreviewMesh.WinTop = WinHeight*0.28;
         PreviewMesh.SetSize(WinWidth*0.40, WinHeight*PreviewHeight);
+        PreviewMesh.FaceButton.HideWindow();
     }
 }
 
@@ -284,6 +287,7 @@ function ActivateRow()
     if(IsLocked(Row) || bActionThisTick || UIClock < NextActionTime) return;
     if(NameProxy == Controls[Row]) { Super.ActivateRow(); return; }
     bActionThisTick = True; NextActionTime = UIClock+0.20;
+    if(PreviewMesh != None && Controls[Row] == PreviewMesh.FaceButton) { PreviewMesh.FacePressed(); return; }
     B = NotifyButton(Controls[Row]);
     if(Character != None)
     {
@@ -335,7 +339,7 @@ function ChangeValue(int Direction)
 
 function RestorePanels()
 {
-    if(PreviewMesh != None) PreviewMesh.SetParent(CampaignWindow);
+    if(PreviewMesh != None) { PreviewMesh.FaceButton.ShowWindow(); PreviewMesh.SetParent(CampaignWindow); }
     if(DetailArea != None) DetailArea.SetParent(CampaignWindow);
 }
 
