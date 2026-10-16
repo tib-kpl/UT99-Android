@@ -22,12 +22,36 @@ Android comme un dossier UT99 habituel ou être placé dans une archive ZIP.
 Les fichiers du jeu ne sont pas intégrés à l'APK ni publiés sur GitHub.
 
 Le script conserve le `System` compatible et prend les quatre dossiers de
-contenu dans l'installation GOTY. Les packages supplémentaires `de` et
-`epiccustommodels` passent également le chargement v400. Les packages modernes
+contenu dans l'installation GOTY. Les packages supplémentaires `de`,
+`epiccustommodels` et `multimesh` passent également le chargement v400.
+Les packages modernes
 `Core`, `Engine`, `Botpack`, les interfaces et les autres packages système
 ne sont pas substitués : ils nécessitent encore un portage distinct.
-Les Relics, MultiMesh, modèles squelettiques et les fonctionnalités propres
+Les Relics, modèles squelettiques et les fonctionnalités propres
 au moteur 469 ne sont donc pas annoncés comme pris en charge.
+
+### Personnages bonus MultiMesh
+
+La préparation inclut MultiMesh avec sa dépendance EpicCustomModels. Les
+fichiers d'enregistrement des personnages, voix, bots et skins sont récupérés
+dans `System` ou `SystemLocalized/int` et `SystemLocalized/frt`, puis placés
+dans le `System` compatible. Les traductions du moteur et des interfaces
+v400 restent celles de l'installation compatible.
+
+Les 21 classes de MultiMesh ont été chargées/exportées avec le moteur v400.
+Sur la Thor, le scénario `UT99PhysicsAudit.GotyModelsAudit` a chargé et affiché
+successivement Nali, WarCow et Skaarj avec leurs textures et une animation de
+repos. Ce test isolé ne certifie pas encore tous leurs comportements en
+partie ni leur réplication réseau. Le scénario n'est pas intégré à l'APK.
+
+Les blocages des autres packages sont identifiés : `Relics` importe
+`Engine.Mutator.NextHUDMutator`, absent de la v400 ; `RelicsBindings` importe
+`UTMenu.UTExtraKeyBindings` ; `SkeletalChars` importe `Botpack.MaleSounds`.
+Ils restent exclus de la préparation. Le garde-fou sur les packages système
+reste actif ; remplacer directement Engine ou Botpack par ceux de 469 ne
+constitue pas une correction compatible.
+
+### Compatibilité réseau
 
 Les clients Android négocient désormais jusqu'au protocole classique 432,
 indépendamment de la version 400 du moteur et de ses packages système. Un

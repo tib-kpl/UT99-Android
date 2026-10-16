@@ -25,6 +25,12 @@ New-Item -ItemType Directory -Force $system | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $engine 'System') -File | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $system $_.Name) -Force
 }
+# Commandlets use the int language even when the game configuration uses frt.
+# Keep diagnostics readable in French-only installations, in the audit copy.
+if (!(Test-Path -LiteralPath (Join-Path $system 'Core.int')) -and
+    (Test-Path -LiteralPath (Join-Path $system 'Core.frt'))) {
+    Copy-Item -LiteralPath (Join-Path $system 'Core.frt') -Destination (Join-Path $system 'Core.int')
+}
 $ini = [IO.File]::ReadAllText((Join-Path $system 'UnrealTournament.ini'))
 $paths = foreach ($pair in @(@('Maps','unr'),@('Textures','utx'),@('Sounds','uax'),@('Music','umx'))) {
     'Paths=' + (Join-Path $content ($pair[0] + '/*.' + $pair[1])).Replace('\','/')
