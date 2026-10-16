@@ -3126,6 +3126,74 @@ void UObject::execRight( FFrame& Stack, RESULT_DECL )
 }
 IMPLEMENT_FUNCTION( UObject, 234, execRight );
 
+// Post-retail Core string and random functions used by modern packages.
+void UObject::execLocs( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_STR(S);
+    P_FINISH;
+    *(FString*)Result = S.Locs();
+}
+IMPLEMENT_FUNCTION( UObject, 238, execLocs );
+
+void UObject::execRepl( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_STR(Src);
+    P_GET_STR(Match);
+    P_GET_STR(With);
+    P_GET_UBOOL_OPTX(bCaseSensitive,0);
+    P_FINISH;
+    FString Out;
+    const INT MatchLen=Match.Len();
+    if( MatchLen==0 )
+    {
+        *(FString*)Result=Src;
+        return;
+    }
+    // Match against the original input: replacements never recursively replace themselves.
+    INT Start=0;
+    for( INT Pos=0; Pos+MatchLen<=Src.Len(); )
+    {
+        const TCHAR* Candidate=*Src+Pos;
+        if( (bCaseSensitive ? appStrncmp(Candidate,*Match,MatchLen) : appStrnicmp(Candidate,*Match,MatchLen))==0 )
+        {
+            Out += Src.Mid(Start,Pos-Start);
+            Out += With;
+            Pos += MatchLen;
+            Start=Pos;
+        }
+        else ++Pos;
+    }
+    Out += Src.Mid(Start);
+    *(FString*)Result=Out;
+}
+IMPLEMENT_FUNCTION( UObject, 239, execRepl );
+
+void UObject::execRandRange( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_FLOAT(Min);
+    P_GET_FLOAT(Max);
+    P_FINISH;
+    *(FLOAT*)Result=Min+(Max-Min)*appFrand();
+}
+IMPLEMENT_FUNCTION( UObject, 1033, execRandRange );
+
+// Script tracing is opt-in and records actual script dispatches, including events.
+static UBOOL GScriptUTracing=0;
+void UObject::execSetUTracing( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_UBOOL(bNewUTracing);
+    P_FINISH;
+    GScriptUTracing=bNewUTracing;
+}
+IMPLEMENT_FUNCTION( UObject, INDEX_NONE, execSetUTracing );
+
+void UObject::execIsUTracing( FFrame& Stack, RESULT_DECL )
+{
+    P_FINISH;
+    *(UBOOL*)Result=GScriptUTracing;
+}
+IMPLEMENT_FUNCTION( UObject, INDEX_NONE, execIsUTracing );
+
 void UObject::execCaps( FFrame& Stack, RESULT_DECL )
 {
 	guardSlow(UObject::execCaps);
@@ -3461,11 +3529,23 @@ void UObject::execSetPropertyText( FFrame& Stack, RESULT_DECL )
 	P_FINISH;
 
 	UProperty* Property=FindField<UProperty>( Class, *PropName );
+#if defined(PLATFORM_ANDROID)
+	UBOOL Imported=0;
+#endif
 	if
 	(	(Property)
 	&&	(Property->GetFlags() & RF_Public)
 	&&	!(Property->PropertyFlags & CPF_Const) )
-		Property->ImportText( *PropValue, (BYTE*)this + Property->Offset, PPF_Localized );
+	{
+		const TCHAR* End=Property->ImportText( *PropValue, (BYTE*)this + Property->Offset, PPF_Localized );
+#if defined(PLATFORM_ANDROID)
+		Imported=End!=NULL;
+#endif
+	}
+#if defined(PLATFORM_ANDROID)
+	UFunction* Setter=FindField<UFunction>(UObject::StaticClass(),TEXT("SetPropertyText"));
+	if(Result && Setter && Setter->GetReturnProperty()) *(UBOOL*)Result=Imported;
+#endif
 
 	unguardexecSlow;
 }
@@ -3479,6 +3559,76 @@ void UObject::execSaveConfig( FFrame& Stack, RESULT_DECL )
 	unguard;
 }
 IMPLEMENT_FUNCTION( UObject, 536, execSaveConfig);
+
+// Remove saved overrides without changing live object values. GlobalConfig keys
+// live in their declaring class section; per-object settings use the object name.
+static void ClearScriptConfig(UObject* Object, const FString& PropName)
+{
+    UClass* Class=Object->GetClass();
+    UBOOL PerObject=(Class->ClassFlags & CLASS_PerObjectConfig) && Object->GetIndex()!=INDEX_NONE;
+    const TCHAR* Filename=(PerObject && Object->GetOuter()!=UObject::GetTransientPackage())
+        ? Object->GetOuter()->GetName() : *Class->ClassConfigName;
+    if( PropName.Len()==0 )
+        GConfig->EmptySection(PerObject ? Object->GetName() : Class->GetPathName(),Filename);
+    for( TFieldIterator<UProperty> It(Class); It; ++It )
+    {
+        if( !(It->PropertyFlags & CPF_Config) || (PropName.Len() && appStricmp(It->GetName(),*PropName)) )
+            continue;
+        const TCHAR* Section=PerObject ? Object->GetName() : (It->PropertyFlags & CPF_GlobalConfig)
+            ? It->GetOwnerClass()->GetPathName() : Class->GetPathName();
+        TMultiMap<FString,FString>* Saved=GConfig->GetSectionPrivate(Section,0,0,Filename);
+        if( !Saved ) continue;
+        Saved->Remove(It->GetName());
+        if( It->ArrayDim>1 )
+            for( INT Index=0;Index<It->ArrayDim;++Index )
+                Saved->Remove(*FString::Printf(TEXT("%s[%i]"),It->GetName(),Index));
+    }
+    GConfig->Flush(0,Filename);
+}
+
+void UObject::execClearConfig( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_STR_OPTX(PropName,TEXT(""));
+    P_FINISH;
+    ClearScriptConfig(this,PropName);
+}
+IMPLEMENT_FUNCTION( UObject, 537, execClearConfig );
+
+void UObject::execStaticClearConfig( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_STR_OPTX(PropName,TEXT(""));
+    P_FINISH;
+    ClearScriptConfig(GetClass()->GetDefaultObject(),PropName);
+}
+IMPLEMENT_FUNCTION( UObject, INDEX_NONE, execStaticClearConfig );
+
+void UObject::execGetDefaultValue( FFrame& Stack, RESULT_DECL )
+{
+    P_GET_STR_REF(PropValue);
+    P_GET_OBJECT(UObject,Obj);
+    P_GET_STR(PropName);
+    P_GET_INT_OPTX(ArrayIndex,0);
+    P_FINISH;
+    *(UBOOL*)Result=0;
+    if( !Obj ) return;
+    UClass* ObjectClass=Obj->GetClass();
+    UProperty* Property=FindField<UProperty>(ObjectClass,*PropName);
+    if( !Property || !(Property->PropertyFlags & CPF_Config) || ArrayIndex<0 || ArrayIndex>=Property->ArrayDim )
+        return;
+    UBOOL PerObject=(ObjectClass->ClassFlags & CLASS_PerObjectConfig) && Obj->GetIndex()!=INDEX_NONE;
+    const TCHAR* Filename=(PerObject && Obj->GetOuter()!=GetTransientPackage())
+        ? Obj->GetOuter()->GetName() : *ObjectClass->ClassConfigName;
+    FString Key=Property->ArrayDim>1 ? FString::Printf(TEXT("%s[%i]"),Property->GetName(),ArrayIndex) : FString(Property->GetName());
+    const TCHAR* Section=PerObject ? Obj->GetName() : (Property->PropertyFlags & CPF_GlobalConfig)
+        ? Property->GetOwnerClass()->GetPathName() : ObjectClass->GetPathName();
+    FString Value;
+    if( GConfig->GetString(Section,*Key,Value,Filename) )
+    {
+        *PropValue=Value;
+        *(UBOOL*)Result=1;
+    }
+}
+IMPLEMENT_FUNCTION( UObject, INDEX_NONE, execGetDefaultValue );
 
 void UObject::execStaticSaveConfig( FFrame& Stack, RESULT_DECL )
 {
@@ -3625,6 +3775,8 @@ struct FOutParmRec
 void UObject::CallFunction( FFrame& Stack, RESULT_DECL, UFunction* Function )
 {
 	guardSlow(UObject::CallFunction);
+	if( GScriptUTracing )
+		debugf(TEXT("UTrace: %s -> %s"),GetPathName(),Function->GetPathName());
 #if DO_GUARD_SLOW
 	DWORD Cycles=0; clock(Cycles);
 #endif
@@ -3730,6 +3882,8 @@ void UObject::ProcessInternal( FFrame& Stack, RESULT_DECL )
 void UObject::ProcessEvent( UFunction* Function, void* Parms, void* UnusedResult )
 {
 	guard(UObject::ProcessEvent);
+	if( GScriptUTracing && Function )
+		debugf(TEXT("UTrace event: %s -> %s"),GetPathName(),Function->GetPathName());
 
 	// Reject.
 	if

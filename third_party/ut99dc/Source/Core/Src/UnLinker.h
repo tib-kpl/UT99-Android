@@ -661,11 +661,12 @@ class ULinkerLoad : public ULinker, public FArchive
         }
 		// Resolve only audited v400 API additions, keeping every other import strict.
 		if( Import.SourceIndex==INDEX_NONE && !Import.XObject && Import.PackageIndex<0 && Pkg
-		&& (Pkg->GetFName()==NAME_Engine || Pkg->GetFName()==FName(TEXT("Botpack"))) )
+		&& (Pkg->GetFName()==NAME_Core || Pkg->GetFName()==NAME_Engine || Pkg->GetFName()==FName(TEXT("Botpack"))) )
 		{
 			FObjectImport& Parent = ImportMap(-Import.PackageIndex-1);
 			if( Parent.ClassName==NAME_Class
-			&& ((Pkg->GetFName()==NAME_Engine && LegacyScriptCompat::Supported(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))
+			&& ((Pkg->GetFName()==NAME_Core && LegacyScriptCompat::SupportedCore(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))
+			 || (Pkg->GetFName()==NAME_Engine && LegacyScriptCompat::Supported(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))
 			 || (Pkg->GetFName()==FName(TEXT("Botpack")) && appStricmp(*Parent.ObjectName,TEXT("ChallengeHUD"))==0
 			   && LegacyScriptCompat::SupportedHUD(Import.ClassName,*Import.ObjectName))) )
 			{

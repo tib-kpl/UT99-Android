@@ -57,11 +57,12 @@ static void EmitRef(TArray<BYTE>& Code, BYTE Op, UObject* Object)
 // ReturnKind: -1=void, 0=false, 1=true. Chain=NULL gives an empty base event.
 static void Function(UStruct* Owner, FArchive& Ar, UField**& Tail,
 	const TCHAR* Name, const TCHAR* Chain, INT ReturnKind,
-	const FParam* Params=NULL, INT Count=0, DWORD Flags=FUNC_Defined)
+	const FParam* Params=NULL, INT Count=0, DWORD Flags=FUNC_Defined, EType ReturnType=Bool, INT NativeIndex=0)
 {
 	if(FindObject<UFunction>(Owner,Name)) return;
 	UFunction* F=new(Owner,Name,RF_Public|RF_Native|RF_Transient)UFunction(NULL);
 	F->FunctionFlags=Flags;
+	F->iNative=NativeIndex;
 	UField** ParamTail=&F->Children;
 	for(INT i=0;i<Count;i++)
 	{
@@ -70,7 +71,7 @@ static void Function(UStruct* Owner, FArchive& Ar, UField**& Tail,
 	UProperty* Return=NULL;
 	if(ReturnKind>=0)
 	{
-		FParam Result={TEXT("ReturnValue"),Bool,NULL,CPF_Parm|CPF_OutParm|CPF_ReturnParm};
+		FParam Result={TEXT("ReturnValue"),ReturnType,NULL,CPF_Parm|CPF_OutParm|CPF_ReturnParm};
 		Return=Property(F,Result); *ParamTail=Return;
 	}
 	F->Link(Ar,1);
@@ -110,6 +111,50 @@ static void Extend(UStruct* Owner, FArchive& Ar, UBOOL Props)
 {
 	if(!Props || !Ar.IsLoading() || Ar.Ver()!=68 || !Owner->GetOuter()
 	) return;
+	// Later scripts test SetPropertyText's boolean result. The v400 native
+	// function has the same inputs but no return property. Add only that
+	// result slot; callers compiled against the old void API still ignore it.
+	if(Owner->IsA(UFunction::StaticClass())
+	&& !appStricmp(Owner->GetName(),TEXT("SetPropertyText"))
+	&& Owner->GetOuter()==UObject::StaticClass())
+	{
+		UField** Tail=&Owner->Children;
+		while(*Tail)
+		{
+			Ar.Preload(*Tail);
+			UProperty* P=Cast<UProperty>(*Tail);
+			if(P && (P->PropertyFlags&CPF_ReturnParm)) return;
+			Tail=&(*Tail)->Next;
+		}
+		FParam Result={TEXT("ReturnValue"),Bool,NULL,CPF_Parm|CPF_OutParm|CPF_ReturnParm};
+		*Tail=Property(Owner,Result);
+		return;
+	}
+    if(Owner==UObject::StaticClass())
+    {
+        UField** Tail=&Owner->Children;
+        while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+        const DWORD StaticNative=FUNC_Native|FUNC_Static|FUNC_Final;
+        FParam Text[]={{TEXT("S"),String,NULL,CPF_Parm|CPF_CoerceParm}};
+        Function(Owner,Ar,Tail,TEXT("Locs"),NULL,0,Text,ARRAY_COUNT(Text),StaticNative,String,238);
+        FParam Replace[]={{TEXT("Src"),String,NULL,CPF_Parm|CPF_CoerceParm},
+            {TEXT("Match"),String,NULL,CPF_Parm|CPF_CoerceParm},
+            {TEXT("With"),String,NULL,CPF_Parm|CPF_CoerceParm},
+            {TEXT("bCaseSensitive"),Bool,NULL,CPF_Parm|CPF_OptionalParm}};
+        Function(Owner,Ar,Tail,TEXT("Repl"),NULL,0,Replace,ARRAY_COUNT(Replace),StaticNative,String,239);
+        FParam Prop[]={{TEXT("PropName"),String,NULL,CPF_Parm|CPF_OptionalParm}};
+        Function(Owner,Ar,Tail,TEXT("ClearConfig"),NULL,-1,Prop,ARRAY_COUNT(Prop),FUNC_Native|FUNC_Final,Bool,537);
+        Function(Owner,Ar,Tail,TEXT("StaticClearConfig"),NULL,-1,Prop,ARRAY_COUNT(Prop),StaticNative);
+        FParam Default[]={{TEXT("PropValue"),String,NULL,CPF_Parm|CPF_OutParm},
+            {TEXT("Obj"),Object,TEXT("Object"),CPF_Parm},
+            {TEXT("PropName"),String,NULL,CPF_Parm},
+            {TEXT("ArrayIndex"),Int,NULL,CPF_Parm|CPF_OptionalParm}};
+        Function(Owner,Ar,Tail,TEXT("GetDefaultValue"),NULL,0,Default,ARRAY_COUNT(Default),StaticNative);
+        FParam Trace[]={{TEXT("bNewUTracing"),Bool,NULL,CPF_Parm}};
+        Function(Owner,Ar,Tail,TEXT("SetUTracing"),NULL,-1,Trace,ARRAY_COUNT(Trace),StaticNative);
+        Function(Owner,Ar,Tail,TEXT("IsUTracing"),NULL,0,NULL,0,StaticNative);
+        return;
+    }
 	if(!appStricmp(Owner->GetOuter()->GetName(),TEXT("Botpack"))
 	&& !appStricmp(Owner->GetName(),TEXT("ChallengeHUD")))
 	{
@@ -206,6 +251,15 @@ static UBOOL Supported(const TCHAR* Owner, FName Type, const TCHAR* Name)
 		TEXT("MutatorBroadcastMessage"),TEXT("MutatorBroadcastLocalizedMessage"),TEXT("RegisterHUDMutator")};
 	for(INT i=0;i<ARRAY_COUNT(Names);i++) if(!appStricmp(Name,Names[i])) return 1;
 	return 0;
+}
+
+static UBOOL SupportedCore(const TCHAR* Owner, FName Type, const TCHAR* Name)
+{
+    if(appStricmp(Owner,TEXT("Object")) || Type!=NAME_Function) return 0;
+    const TCHAR* Names[]={TEXT("Locs"),TEXT("Repl"),TEXT("ClearConfig"),TEXT("StaticClearConfig"),
+        TEXT("GetDefaultValue"),TEXT("SetUTracing"),TEXT("IsUTracing")};
+    for(INT i=0;i<ARRAY_COUNT(Names);i++) if(!appStricmp(Name,Names[i])) return 1;
+    return 0;
 }
 
 static UBOOL SupportedHUD(FName Type, const TCHAR* Name)

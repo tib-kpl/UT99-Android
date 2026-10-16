@@ -452,6 +452,70 @@ const TCHAR* UIntProperty::ImportText( const TCHAR* Buffer, BYTE* Data, INT Port
 }
 IMPLEMENT_CLASS(UIntProperty);
 
+#if defined(PLATFORM_ANDROID)
+void UPointerProperty::Link(FArchive& Ar, UProperty* Prev)
+{
+	Super::Link(Ar,Prev);
+	ElementSize=sizeof(void*);
+	Offset=Align(GetOuterUField()->GetPropertiesSize(),PROPERTY_ALIGNMENT);
+}
+void UPointerProperty::CopySingleValue(void* Dest, void* Src) const
+{
+	appMemcpy(Dest,Src,sizeof(void*));
+}
+void UPointerProperty::CopyCompleteValue(void* Dest, void* Src) const
+{
+	appMemcpy(Dest,Src,ArrayDim*sizeof(void*));
+}
+UBOOL UPointerProperty::Identical(const void* A, const void* B) const
+{
+	UPTRINT Left=0,Right=0;
+	appMemcpy(&Left,A,sizeof(Left));
+	if(B) appMemcpy(&Right,B,sizeof(Right));
+	return Left==Right;
+}
+void UPointerProperty::SerializeItem(FArchive& Ar, void* Value) const
+{
+	// Native/transient pointers are excluded by ShouldSerializeValue. For the
+	// persistent representation the public SDK specifies the IntProperty tag;
+	// preserve its 32-bit disk width independently of Android's pointer width.
+	if(Ar.IsPersistent())
+	{
+		UPTRINT Pointer=0;
+		if(!Ar.IsLoading()) appMemcpy(&Pointer,Value,sizeof(Pointer));
+		DWORD Stored=(DWORD)Pointer;
+		Ar << Stored;
+		if(Ar.IsLoading()) { Pointer=Stored; appMemcpy(Value,&Pointer,sizeof(Pointer)); }
+	}
+	else Ar.Serialize(Value,sizeof(void*));
+}
+UBOOL UPointerProperty::NetSerializeItem(FArchive& Ar, UPackageMap* Map, void* Data) const
+{
+	// A native address is process-local, not a network object reference.
+	return 0;
+}
+void UPointerProperty::ExportCppItem(FOutputDevice& Out) const
+{
+	Out.Log(TEXT("void*"));
+}
+void UPointerProperty::ExportTextItem(TCHAR* ValueStr, BYTE* Value, BYTE* Default, INT Flags) const
+{
+	// Do not expose process addresses through script/configuration text.
+	appStrcpy(ValueStr,TEXT("None"));
+}
+const TCHAR* UPointerProperty::ImportText(const TCHAR* Buffer, BYTE* Data, INT Flags) const
+{
+	if(appStrnicmp(Buffer,TEXT("None"),4)==0
+	&& !appIsAlnum(Buffer[4]) && Buffer[4]!='_')
+	{
+		appMemzero(Data,sizeof(void*));
+		return Buffer+4;
+	}
+	return NULL;
+}
+IMPLEMENT_CLASS(UPointerProperty);
+#endif
+
 /*-----------------------------------------------------------------------------
 	UBoolProperty.
 -----------------------------------------------------------------------------*/

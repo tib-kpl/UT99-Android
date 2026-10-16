@@ -23,7 +23,10 @@ public:
 	{
 		if( LogAr )
 		{
-			Logf( NAME_Log, TEXT("Log file closed, %s"), appTimestamp() );
+			// A fatal error may already have destroyed the global name table.
+			// Still close/flush the archive, but do not format another named log event.
+			if( !GIsCriticalError )
+				Logf( NAME_Log, TEXT("Log file closed, %s"), appTimestamp() );
 			delete LogAr;
 			LogAr = NULL;
 		}

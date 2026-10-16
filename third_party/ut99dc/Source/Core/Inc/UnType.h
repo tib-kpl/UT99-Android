@@ -152,6 +152,28 @@ class CORE_API UIntProperty : public UProperty
 	void CopyCompleteValue( void* Dest, void* Src ) const;
 };
 
+#if defined(PLATFORM_ANDROID)
+// Later packages describe opaque native pointers explicitly instead of using
+// IntProperty placeholders. They are not UObject references and must never
+// be followed by the garbage collector.
+class CORE_API UPointerProperty : public UProperty
+{
+	DECLARE_CLASS(UPointerProperty,UProperty,0)
+public:
+	UPointerProperty() {}
+	void Link(FArchive& Ar, UProperty* Prev);
+	UBOOL Identical(const void* A, const void* B) const;
+	void SerializeItem(FArchive& Ar, void* Value) const;
+	UBOOL NetSerializeItem(FArchive& Ar, UPackageMap* Map, void* Data) const;
+	void ExportCppItem(FOutputDevice& Out) const;
+	void ExportTextItem(TCHAR* ValueStr, BYTE* Value, BYTE* Default, INT Flags) const;
+	const TCHAR* ImportText(const TCHAR* Buffer, BYTE* Data, INT Flags) const;
+	void CopySingleValue(void* Dest, void* Src) const;
+	void CopyCompleteValue(void* Dest, void* Src) const;
+	BYTE GetID() const { return NAME_IntProperty; }
+};
+#endif
+
 /*-----------------------------------------------------------------------------
 	UBoolProperty.
 -----------------------------------------------------------------------------*/

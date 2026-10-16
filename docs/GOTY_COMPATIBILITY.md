@@ -1,4 +1,4 @@
-# GOTY / OldUnreal : branche expérimentale
+# GOTY / OldUnreal : compatibilité du moteur Android
 
 La branche `master` conserve le moteur Android natif avec deux menus au choix.
 Elle ne
@@ -376,3 +376,36 @@ en conservant les données et rétablit le menu correspondant, même après un
 changement de variante. Les essais locaux utilisent un identifiant séparé
 pour préserver l'installation habituelle. Le statut de release ne signifie
 pas que tous les packages système et mods 469 sont compatibles.
+
+## Étape Core 469f
+
+Le moteur Android reconnaît maintenant `PointerProperty`, avec un stockage
+adapté à la largeur des pointeurs ARM32/ARM64 et sans considérer ces valeurs
+comme des références UObject. La saisie textuelle accepte `None` et refuse
+les adresses numériques. Les API Core `Locs`, `Repl`, `RandRange`, `ClearConfig`,
+`StaticClearConfig`, `GetDefaultValue`, `SetUTracing` et `IsUTracing` sont
+implémentées. Les fonctions absentes du Core v400 sont ajoutées en mémoire avec
+leurs signatures précises et une liste fermée d'imports autorisés ; les
+fichiers du jeu restent intacts. `SetPropertyText` fournit aussi le booléen
+attendu par les scripts récents, tout en conservant les appels v400 sans retour.
+
+Le scénario `tools/core_format_audit` passe ses 22 contrôles sur ARMv7 et ARM64,
+avec les paquets système v400. Le contrôle supplémentaire d'un appel compilé
+contre la signature v400 sans retour passe aussi. Les 18 vérifications d'API
+concordent avec le moteur PC officiel 469f-rc5. Un essai diagnostique isolé
+charge le `Core.u` officiel 469f-rc5 et démarre DM-Oblivion sur les deux
+architectures, avec Engine/Botpack v400 ; les mêmes 22 contrôles passent.
+
+**La prise en charge complète des fichiers système 469 n'est pas terminée.**
+Avec le paquet Engine récent, le premier blocage identifié est le changement
+de format de `Engine.Actor.Touching`, auparavant tableau statique d'objets.
+Les structures natives, les anciens imports et les accès du moteur aux
+contacts doivent être adaptés ensemble. Registry et les autres différences
+natives restent à vérifier. Le lanceur publié exige donc encore Core,
+Engine et Botpack v400 ; l'essai Core seul ne justifie pas de lever ce contrôle.
+
+L'installation automatique depuis les sources officielles reste à réaliser
+après cette compatibilité. Elle devra conserver l'import des fichiers propres
+à l'utilisateur, proposer le dossier cible et **le choix de la langue avant le
+téléchargement**, avec la langue de l'appareil présélectionnée et modifiable.
+Ce parcours sera commun aux deux variantes de menu.

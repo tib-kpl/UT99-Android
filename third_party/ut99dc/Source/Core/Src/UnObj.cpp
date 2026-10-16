@@ -8,6 +8,9 @@
 
 #include "CorePrivate.h"
 #include "UT99LoadProfiler.h"
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 // maximqad:: remove that when zeroing on actor construct is fixed
 static UProperty* FindRoleProperty( UClass* InClass )
 {
@@ -3891,7 +3894,13 @@ void* UPackage::GetDllExport( const TCHAR* ExportName, UBOOL Checked )
 	{
 		Result = appGetDllExport( DllHandle, ExportName );
 		if( !Result && Checked && !ParseParam(appCmdLine(),TEXT("nobind")) )
+		{
+#if defined(__ANDROID__)
+			// Keep the missing binding visible even if startup fails before the file log flushes.
+			__android_log_print(ANDROID_LOG_ERROR,"UT99", "Missing native export %s in %s", appToAnsi(ExportName), appToAnsi(GetName()));
+#endif
 			appErrorf( LocalizeError("NotInDll"), ExportName, GetName() );
+		}
 		if( Result )
 			debugfSlow( NAME_DevBind, TEXT("Found %s in %s%s"), ExportName, GetName(), DLLEXT );
 	}
