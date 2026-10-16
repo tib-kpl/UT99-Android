@@ -8,6 +8,11 @@
 
 #include "EnginePrivate.h"
 #include "UnNet.h"
+#if defined(PLATFORM_ANDROID)
+extern "C" int UT99AndroidRedirectStart(const char*,const char*,int,int);
+extern "C" int UT99AndroidRedirectPoll(int);
+extern "C" void UT99AndroidRedirectCancel();
+#endif
 
 /*-----------------------------------------------------------------------------
 	UPendingLevel implementation.
@@ -37,6 +42,9 @@ UNetPendingLevel::UNetPendingLevel( UEngine* InEngine, const FURL& InURL )
 	// Init.
 	Error     = TEXT("");
 	NetDriver = NULL;
+#if defined(PLATFORM_ANDROID)
+	RedirectPackage = INDEX_NONE;
+#endif
 
 	// Try to create network driver.
 	UClass* NetDriverClass = StaticLoadClass( UNetDriver::StaticClass(), NULL, TEXT("ini:Engine.Engine.NetworkDevice"), NULL, LOAD_NoFail, NULL );
@@ -150,6 +158,25 @@ void UNetPendingLevel::NotifyReceivedText( UNetConnection* Connection, const TCH
 		Parse( Text, TEXT("FLAGS="), Info.PackageFlags );
 		Parse( Text, TEXT("PKG="), PackageName, ARRAY_COUNT(PackageName) );
 		Info.Parent = CreatePackage(NULL,PackageName);
+#if defined(PLATFORM_ANDROID)
+		TCHAR Filename[256]=TEXT("");
+		Parse(Text,TEXT("FNAME="),Filename,ARRAY_COUNT(Filename));
+		new(RedirectNames)FString(Filename);
+#endif
+	}
+	else if( ParseCommand(&Text,TEXT("DLMGR")) )
+	{
+#if defined(PLATFORM_ANDROID)
+		TCHAR ClassName[128]=TEXT(""), Params[2048]=TEXT("");
+		Parse(Text,TEXT("CLASS="),ClassName,ARRAY_COUNT(ClassName));
+		Parse(Text,TEXT("PARAMS="),Params,ARRAY_COUNT(Params));
+		if( !RedirectURL.Len() && appStricmp(ClassName,TEXT("IpDrv.HTTPDownload"))==0
+		&& (appStrnicmp(Params,TEXT("http://"),7)==0 || appStrnicmp(Params,TEXT("https://"),8)==0) )
+		{
+			RedirectURL=Params;
+			ParseUBOOL(Text,TEXT("COMPRESSION="),RedirectCompressed);
+		}
+#endif
 	}
 	else if( ParseCommand(&Text,TEXT("USERFLAG")) )
 	{
@@ -240,7 +267,14 @@ void UNetPendingLevel::NotifyReceivedText( UNetConnection* Connection, const TCH
 		// Send first download request.
 		for( INT i=0; i<Connection->PackageMap->List.Num(); i++ )
 			if( Connection->PackageMap->List(i).PackageFlags & PKG_Need )
-				{Connection->ReceiveFile( i ); break;}
+				{
+#if defined(PLATFORM_ANDROID)
+					ReceivePackage(i);
+#else
+					Connection->ReceiveFile(i);
+#endif
+					break;
+				}
 
 		// We have successfully connected.
 		Success = 1;
@@ -275,7 +309,14 @@ void UNetPendingLevel::NotifyReceivedFile( UNetConnection* Connection, INT Packa
 		// Send next download request.
 		for( INT i=0; i<Connection->PackageMap->List.Num(); i++ )
 			if( Connection->PackageMap->List(i).PackageFlags & PKG_Need )
-				{Connection->ReceiveFile( i ); break;}
+				{
+#if defined(PLATFORM_ANDROID)
+					ReceivePackage(i);
+#else
+					Connection->ReceiveFile(i);
+#endif
+					break;
+				}
 	}
 	unguard;
 }
@@ -308,6 +349,9 @@ void UNetPendingLevel::Tick( FLOAT DeltaTime )
 
 	// Update network driver.
 	NetDriver->TickDispatch( DeltaTime );
+#if defined(PLATFORM_ANDROID)
+	TickRedirect(DeltaTime);
+#endif
 	NetDriver->TickFlush();
 
 	unguard;
@@ -324,6 +368,103 @@ void UNetPendingLevel::SendJoin()
 	unguard;
 }
 IMPLEMENT_CLASS(UNetPendingLevel);
+
+#if defined(PLATFORM_ANDROID)
+void UNetPendingLevel::ReceivePackage(INT Index)
+{
+	FPackageInfo& Info=NetDriver->ServerConnection->PackageMap->List(Index);
+	if( RedirectURL.Len() && RedirectNames.IsValidIndex(Index) && RedirectNames(Index).Len()
+	&& Info.FileSize>0 && Info.FileSize<=256*1024*1024 )
+	{
+		FString Name=RedirectNames(Index), Escaped;
+		UBOOL Safe=Name.Len()<256;
+		for(INT i=0; i<Name.Len(); i++)
+		{
+			BYTE C=(BYTE)(*Name)[i];
+			if(C=='/' || C=='\\' || C==':' || C<32) Safe=0;
+			if((C>='a'&&C<='z') || (C>='A'&&C<='Z') || (C>='0'&&C<='9') || C=='-' || C=='_' || C=='.')
+				Escaped+=FString::Printf(TEXT("%c"),C);
+			else Escaped+=FString::Printf(TEXT("%%%02X"),C);
+		}
+		TCHAR Temp[256];
+		FString TempDirectory=GSys->CachePath+PATH_SEPARATOR;
+		appCreateTempFilename(*TempDirectory,Temp);
+		RedirectTemp=Temp;
+		FString Address=RedirectURL;
+		if(Address.Right(1)!=TEXT("/")) Address+=TEXT("/");
+		Address+=Escaped;
+		if(RedirectCompressed) Address+=TEXT(".uz");
+		if(Safe && UT99AndroidRedirectStart(TCHAR_TO_ANSI(*Address),TCHAR_TO_ANSI(*RedirectTemp),Info.FileSize,RedirectCompressed))
+		{
+			RedirectPackage=Index;
+			RedirectClock=0;
+			RedirectStarted=appSeconds();
+			debugf(NAME_Log,TEXT("Android download: HTTP start package=%s compressed=%i"),Info.Parent->GetName(),RedirectCompressed);
+			return;
+		}
+	}
+	NetDriver->ServerConnection->ReceiveFile(Index);
+}
+
+void UNetPendingLevel::TickRedirect(FLOAT DeltaTime)
+{
+	if(RedirectPackage==INDEX_NONE) return;
+	INT Status=UT99AndroidRedirectPoll(0);
+	RedirectClock+=DeltaTime;
+	if(Status==0 && appSeconds()-RedirectStarted<180.0)
+	{
+		if(RedirectClock>0.25)
+		{
+			RedirectClock=0;
+			FPackageInfo& Info=NetDriver->ServerConnection->PackageMap->List(RedirectPackage);
+			FString Progress=FString::Printf(TEXT("%s - HTTP: %.2f MB"),Info.Parent->GetName(),Max(0,UT99AndroidRedirectPoll(1))/1048576.0);
+			NotifyProgress(TEXT("Downloading"),*Progress,1.0);
+		}
+		return;
+	}
+	INT Index=RedirectPackage;
+	RedirectPackage=INDEX_NONE;
+	FPackageInfo& Info=NetDriver->ServerConnection->PackageMap->List(Index);
+	UBOOL Valid=0;
+	if(Status==1 && GFileManager->FileSize(*RedirectTemp)==Info.FileSize)
+	{
+		FArchive* Reader=GFileManager->CreateFileReader(*RedirectTemp);
+		if(Reader && Reader->TotalSize()>=52)
+		{
+			DWORD Tag=0, Version=0;
+			FGuid Guid;
+			*Reader << Tag << Version;
+			Reader->Seek(36);
+			*Reader << Guid;
+			Valid=!Reader->IsError() && Tag==PACKAGE_FILE_TAG && (Version>>16)==0 && (Version&65535)>=68 && (Version&65535)<=69 && Guid==Info.Guid;
+		}
+		delete Reader;
+	}
+	if(Valid)
+	{
+		FString Dest=FString::Printf(TEXT("%s") PATH_SEPARATOR TEXT("%s.uxx"),*GSys->CachePath,Info.Guid.String());
+		Valid=GFileManager->Move(*Dest,*RedirectTemp);
+	}
+	UT99AndroidRedirectCancel();
+	if(Valid)
+	{
+		debugf(NAME_Log,TEXT("Android download: HTTP complete package=%s bytes=%i seconds=%.3f"),Info.Parent->GetName(),Info.FileSize,appSeconds()-RedirectStarted);
+		NotifyReceivedFile(NetDriver->ServerConnection,Index,TEXT(""));
+	}
+	else
+	{
+		GFileManager->Delete(*RedirectTemp);
+		debugf(NAME_Log,TEXT("Android download: HTTP unavailable or invalid package=%s; using file channel"),Info.Parent->GetName());
+		NetDriver->ServerConnection->ReceiveFile(Index);
+	}
+}
+
+void UNetPendingLevel::Destroy()
+{
+	if(RedirectPackage!=INDEX_NONE) UT99AndroidRedirectCancel();
+	Super::Destroy();
+}
+#endif
 
 /*-----------------------------------------------------------------------------
 	The End.

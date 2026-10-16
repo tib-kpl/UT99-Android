@@ -248,6 +248,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        Ut99RedirectDownload.cancel();
         final boolean finishing = isFinishing();
         try {
             if (ut99RetroTouchBridge != null) {

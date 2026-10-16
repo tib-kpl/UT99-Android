@@ -44,6 +44,18 @@ class UNetPendingLevel : public UPendingLevel
 	DECLARE_CLASS(UNetPendingLevel,UPendingLevel,CLASS_Transient)
 	NO_DEFAULT_CONSTRUCTOR(UNetPendingLevel)
 
+#if defined(PLATFORM_ANDROID)
+	FString RedirectURL, RedirectTemp;
+	TArray<FString> RedirectNames;
+	INT RedirectPackage;
+	UBOOL RedirectCompressed;
+	FLOAT RedirectClock;
+	DOUBLE RedirectStarted;
+	void ReceivePackage(INT PackageIndex);
+	void TickRedirect(FLOAT DeltaTime);
+	void Destroy();
+#endif
+
 	// Constructors.
 	UNetPendingLevel( UEngine* InEngine, const FURL& InURL );
 

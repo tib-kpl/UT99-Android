@@ -10,6 +10,54 @@
 #include <jni.h>
 #include <android/log.h>
 #include "SDL_system.h"
+#include <unistd.h>
+
+extern "C" int UT99AndroidRedirectStart(const char* Address,const char* Path,int Size,int Compressed)
+{
+    JNIEnv* Env=(JNIEnv*)SDL_AndroidGetJNIEnv();
+    if(!Env) return 0;
+    jclass C=Env->FindClass("com/ast/ut99/Ut99RedirectDownload");
+    if(!C) { Env->ExceptionClear(); return 0; }
+    jmethodID M=Env->GetStaticMethodID(C,"start","(Ljava/lang/String;Ljava/lang/String;IZ)Z");
+    char Absolute[4096];
+    if(Path[0]=='/') snprintf(Absolute,sizeof(Absolute),"%s",Path);
+    else
+    {
+        char Cwd[2048];
+        if(!getcwd(Cwd,sizeof(Cwd))) { Env->DeleteLocalRef(C); return 0; }
+        snprintf(Absolute,sizeof(Absolute),"%s/%s",Cwd,Path);
+    }
+    jstring A=Env->NewStringUTF(Address), P=Env->NewStringUTF(Absolute);
+    int Result=M ? Env->CallStaticBooleanMethod(C,M,A,P,Size,Compressed!=0) : 0;
+    if(Env->ExceptionCheck()) { Env->ExceptionClear(); Result=0; }
+    Env->DeleteLocalRef(A); Env->DeleteLocalRef(P); Env->DeleteLocalRef(C);
+    return Result;
+}
+
+extern "C" int UT99AndroidRedirectPoll(int Progress)
+{
+    JNIEnv* Env=(JNIEnv*)SDL_AndroidGetJNIEnv();
+    if(!Env) return -1;
+    jclass C=Env->FindClass("com/ast/ut99/Ut99RedirectDownload");
+    if(!C) { Env->ExceptionClear(); return -1; }
+    jmethodID M=Env->GetStaticMethodID(C,Progress ? "progress" : "status","()I");
+    int Result=M ? Env->CallStaticIntMethod(C,M) : -1;
+    if(Env->ExceptionCheck()) { Env->ExceptionClear(); Result=-1; }
+    Env->DeleteLocalRef(C);
+    return Result;
+}
+
+extern "C" void UT99AndroidRedirectCancel()
+{
+    JNIEnv* Env=(JNIEnv*)SDL_AndroidGetJNIEnv();
+    if(!Env) return;
+    jclass C=Env->FindClass("com/ast/ut99/Ut99RedirectDownload");
+    if(!C) { Env->ExceptionClear(); return; }
+    jmethodID M=Env->GetStaticMethodID(C,"cancel","()V");
+    if(M) Env->CallStaticVoidMethod(C,M);
+    if(Env->ExceptionCheck()) Env->ExceptionClear();
+    Env->DeleteLocalRef(C);
+}
 static void UT99AndroidSetJavaImeWantedV76( int Wanted )
 {
     JNIEnv* Env = (JNIEnv*)SDL_AndroidGetJNIEnv();

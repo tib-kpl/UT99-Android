@@ -22,6 +22,7 @@
         android:extractNativeLibs="true"
         android:hardwareAccelerated="false"
         android:hasCode="true"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:isGame="true"
         android:banner="@drawable/ouya_icon"
