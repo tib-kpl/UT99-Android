@@ -11,6 +11,9 @@ Revision history:
 ------------------------------------------------------------------------------------*/
 
 #include "AudioPrivate.h"
+#if defined(PLATFORM_ANDROID)
+#include "SDL_audio.h"
+#endif
 
 /*------------------------------------------------------------------------------------
 	WAVE management.
@@ -60,7 +63,11 @@ Sample* LoadWAV( Sample* lSample, MemChunk* Chunk )
 					lSample->LoopStart = 0;
 					lSample->LoopEnd = 0;
 					lSample->SamplesPerSec = FormatHeader.SamplesPerSec;
-					if ((lSample->SamplesPerSec != 11025) && (lSample->SamplesPerSec != 22050) && (lSample->SamplesPerSec != 44100))
+					if ((lSample->SamplesPerSec != 11025) && (lSample->SamplesPerSec != 22050) && (lSample->SamplesPerSec != 44100)
+#if defined(PLATFORM_ANDROID)
+					    && (lSample->SamplesPerSec < 8000 || lSample->SamplesPerSec > 192000)
+#endif
+					)
 						appErrorf( TEXT("Unsupported rate: %i"), lSample->SamplesPerSec );
 					if (lSample->Data = appMalloc(ChunkHeader.Size, TEXT("Sample data.")))
 						ReadMem(lSample->Data, FormatHeader.BlockAlign, lSample->Length, Chunk);
@@ -91,6 +98,35 @@ Sample* LoadWAV( Sample* lSample, MemChunk* Chunk )
 			FileHeader.Size -= (((ChunkHeader.Size+1)&~1)+8);
 		}
 	}
+#if defined(PLATFORM_ANDROID)
+	// Bonus-pack sounds also use 16 kHz PCM. The legacy mixer accepts only
+	// 11025/22050/44100 Hz; resample once at load time, including loop points.
+	if( lSample->Data && lSample->SamplesPerSec!=11025
+	&& lSample->SamplesPerSec!=22050 && lSample->SamplesPerSec!=44100 )
+	{
+		INT OldRate=lSample->SamplesPerSec;
+		INT NewRate=OldRate<=22050 ? 22050 : 44100;
+		INT Channels=(lSample->Type&SAMPLE_STEREO) ? 2 : 1;
+		INT Bytes=(lSample->Type&SAMPLE_16BIT) ? 2 : 1;
+		SDL_AudioFormat Format=Bytes==2 ? AUDIO_S16LSB : AUDIO_U8;
+		SDL_AudioCVT Conversion;
+		if( SDL_BuildAudioCVT(&Conversion,Format,Channels,OldRate,Format,Channels,NewRate)<0
+		|| lSample->Length > 0x7fffffff/(Channels*Bytes*Max(1,Conversion.len_mult)) )
+			appErrorf(TEXT("Unable to resample PCM sound at %i Hz"),OldRate);
+		Conversion.len=lSample->Length*Channels*Bytes;
+		Conversion.buf=(Uint8*)appMalloc(Conversion.len*Conversion.len_mult,TEXT("Resampled PCM"));
+		appMemcpy(Conversion.buf,lSample->Data,Conversion.len);
+		if( SDL_ConvertAudio(&Conversion)<0 )
+			appErrorf(TEXT("Unable to convert PCM sound at %i Hz"),OldRate);
+		appFree(lSample->Data);
+		lSample->Data=Conversion.buf;
+		lSample->Length=Conversion.len_cvt/(Channels*Bytes);
+		lSample->LoopStart=Min(lSample->Length,(DWORD)((double)lSample->LoopStart*NewRate/OldRate));
+		lSample->LoopEnd=Min(lSample->Length,(DWORD)((double)lSample->LoopEnd*NewRate/OldRate));
+		lSample->SamplesPerSec=NewRate;
+		debugf(NAME_Log,TEXT("Android audio: resampled PCM from %i to %i Hz"),OldRate,NewRate);
+	}
+#endif
 	return lSample;
 }
 

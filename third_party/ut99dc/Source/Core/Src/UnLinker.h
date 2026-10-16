@@ -640,8 +640,35 @@ class ULinkerLoad : public ULinker, public FArchive
 			goto Rehack;
 		}
 
+#if defined(PLATFORM_ANDROID)
+		// Only the two explicitly supported runtime fields may be resolved
+		// outside the on-disk v400 export table. All other imports stay strict.
+		if( Import.SourceIndex==INDEX_NONE && Import.PackageIndex<0 && Pkg
+		&& Pkg->GetFName()==NAME_Engine
+		&& ((appStricmp(*Import.ObjectName,TEXT("NextHUDMutator"))==0 && Import.ClassName==FName(TEXT("ObjectProperty")))
+		 || (appStricmp(*Import.ObjectName,TEXT("bHUDMutator"))==0 && Import.ClassName==FName(TEXT("BoolProperty")))) )
+		{
+			FObjectImport& Parent = ImportMap(-Import.PackageIndex-1);
+			if( Parent.ClassName==NAME_Class && appStricmp(*Parent.ObjectName,TEXT("Mutator"))==0 )
+			{
+				UClass* Owner = Cast<UClass>(CreateImport(-Import.PackageIndex-1));
+				if( Owner )
+				{
+					Import.SourceLinker->Preload(Owner);
+					UProperty* Field = FindObject<UProperty>(Owner,*Import.ObjectName);
+					if( Field && Field->GetOuter()==Owner && Field->GetFlags()&RF_Transient
+					&& Field->GetClass()->GetFName()==Import.ClassName )
+					{
+						Import.XObject = Field;
+						GImportCount++;
+					}
+				}
+			}
+		}
+#endif
+
 		// If not found in file, see if it's a public native transient class.
-		if( Import.SourceIndex==INDEX_NONE && Pkg!=NULL )
+		if( Import.SourceIndex==INDEX_NONE && !Import.XObject && Pkg!=NULL )
 		{
 			UObject* ClassPackage = FindObject<UPackage>( NULL, *Import.ClassPackage );
 			if( ClassPackage )

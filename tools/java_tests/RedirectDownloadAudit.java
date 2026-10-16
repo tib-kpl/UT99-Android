@@ -29,6 +29,10 @@ public final class RedirectDownloadAudit {
                 throw new AssertionError("Accepted truncated UZ");
             } catch (IOException correct) { }
         }
+        // Synthetic AB repetition uses the extra RLE stage of UZ signature 5678.
+        byte[] modernUz = java.util.Base64.getDecoder().decode("LhYAAAlzYW1wbGUudQAcAAAA/wAABgR4IEADA34QIIMCPRiwwYF/CBBDgjwUqKFBPwyYYcEeDtzw4H8ECCNCPBKkkSE/CpRRoR4N2ujQPwaMMWEeC9bYsB8HzrhwjwdvfPh/AgQTIjwRookRPwmSSZGeDNnkyD8FiilRngrV1KifBs20aE+Hbnr0PwOGGTGeCdPMmJ8Fy6xYz4ZtduyfA8ecOM+Fa27cz4NnXrznwzc//n8BAgsSvBChhQm/CJFFiV6M2OLEvwSJJUleitTSpF+GzLJkL0duefK/AoUVKV6J0sqUX4XKqlSvRm116l+Dxpo0r0VrbdqvQ2ddutejtz79vwGDDRneiNHGjN+EyaZMb8Zsc+bfgsWWLG/FamvWb8NmW7a3Y7c9+9+Bw44c78RpZ87vwmVXrnfjtjv378FjT5734rU37/fhsy/f+/Hbn3/AAACAoAAAAAAAAAOhIQAAAAAAnwAAAAAAgJ8A");
+        check(Arrays.equals("AB".repeat(64).getBytes("US-ASCII"),
+                Ut99RedirectDownload.decodeUz(modernUz, 128)), "UZ 5678 differs");
         Random random = new Random(469);
         for (int i = 0; i < 1000; i++) {
             byte[] invalid = new byte[128];

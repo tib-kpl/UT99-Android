@@ -27,8 +27,9 @@ contenu dans l'installation GOTY. Les packages supplémentaires `de`,
 Les packages modernes
 `Core`, `Engine`, `Botpack`, les interfaces et les autres packages système
 ne sont pas substitués : ils nécessitent encore un portage distinct.
-Les Relics, modèles squelettiques et les fonctionnalités propres
-au moteur 469 ne sont donc pas annoncés comme pris en charge.
+Les modèles squelettiques et les fonctionnalités propres au moteur 469
+nécessitent encore des adaptations. Relics demande les extensions Android
+décrites ci-dessous, présentes dans cette branche.
 
 ### Personnages bonus MultiMesh
 
@@ -44,14 +45,62 @@ successivement Nali, WarCow et Skaarj avec leurs textures et une animation de
 repos. Ce test isolé ne certifie pas encore tous leurs comportements en
 partie ni leur réplication réseau. Le scénario n'est pas intégré à l'APK.
 
-Les blocages des autres packages sont identifiés : `Relics` importe
-`Engine.Mutator.NextHUDMutator`, absent de la v400 ; `RelicsBindings` importe
-`UTMenu.UTExtraKeyBindings` ; `SkeletalChars` importe `Botpack.MaleSounds`.
-Ils restent exclus de la préparation. Le garde-fou sur les packages système
-reste actif ; remplacer directement Engine ou Botpack par ceux de 469 ne
-constitue pas une correction compatible.
+### Reliques et sons du bonus pack
+
+Le package `Relics.u` original est conservé. Le moteur Android complète en
+mémoire la classe v400 `Engine.Mutator` avec `NextHUDMutator` et `bHUDMutator`.
+Ces champs ont un stockage natif correspondant et participent au suivi des
+références et au nettoyage des acteurs. Les imports autorisés se limitent à
+ces deux champs précis ; les autres imports restent stricts. Engine.u, son
+GUID et ses indices d'export ne sont pas modifiés.
+
+Les sons PCM à 16 kHz de Relics provoquaient un arrêt dans le lecteur WAV,
+limité à 11025/22050/44100 Hz. Android rééchantillonne désormais les fréquences
+PCM intermédiaires vers un débit accepté par le mixeur, avec conversion des
+points de boucle. Le fichier source reste intact.
+
+Le scénario isolé `UT99PhysicsAudit.RelicsAudit` contrôle les six prises et
+l'enregistrement du HUD, la régénération, la vitesse, l'absorption de défense,
+la force, la survie de rédemption et la création de l'onde de vengeance.
+Ces contrôles passent en ARMv7 ; prises, HUD, régénération et vitesse ont aussi
+été vérifiés en ARM64. Le scénario n'est pas intégré à l'APK. La préparation des données inclut Relics et ses traductions ; elle
+nécessite cette version du moteur Android, pas un exécutable v400 original.
+
+Le scénario `RelicsNetworkAudit`, également réservé aux essais, donne une
+relique de régénération aux deux clients d'un serveur 469. Les clients ARM64
+et ARMv7 reçoivent la relique, affichent son icône et atteignent la santé 150
+confirmée par le serveur.
+
+`RelicsBindings` reste exclu : la classe `UTMenu.UTExtraKeyBindings` et sa
+prise en charge par l'interface doivent encore être ajoutées. `SkeletalChars`
+demande les objets audio déplacés dans Botpack, mais aussi les types natifs
+`SkeletalMesh` et `Animation`, absents du moteur actuel. Leur prise en charge
+ne se résume donc pas à un remplacement de référence audio. Le garde-fou sur
+les packages système reste actif.
 
 ### Compatibilité réseau
+
+Les redirections `IpDrv.HTTPDownload` annoncées par le serveur sont maintenant
+prises en charge en HTTP/HTTPS, avec fichiers bruts ou compressés `.uz`
+(signatures 1234 et 5678). Le transfert et la décompression s'exécutent hors
+du thread du jeu. La taille, l'en-tête et le GUID du package sont vérifiés
+avant son placement en cache. Une erreur HTTP, une réponse invalide ou une
+mauvaise version provoque un repli vers le canal fichier classique. Les
+installations locales et leurs packages ne sont jamais écrasés.
+
+Une copie de carte de test de 952119 octets, absente des deux consoles, a été
+téléchargée par le miroir HTTP local sur Wi-Fi, puis chargée sur Thor et Odin
+avec connexion au serveur 469. Les fichiers reçus correspondent au SHA-256
+du fichier source. Le test d'un miroir fournissant un autre GUID confirme le
+repli et la réception de la bonne carte. Ces essais ne constituent pas une
+mesure du débit d'un serveur Internet. Sans miroir configuré par le serveur,
+le téléchargement conserve le canal historique et ses limites.
+
+Le test JVM `tools/java_tests/RedirectDownloadAudit.java` prend un package
+local et son fichier `.uz` produit par UCC. Il vérifie l'identité des données,
+la redirection HTTP, les entrées tronquées, mille flux malformés, le code 404,
+la taille incorrecte et l'annulation. Aucun fichier du jeu n'est livré avec
+ce test.
 
 Les clients Android négocient désormais jusqu'au protocole classique 432,
 indépendamment de la version 400 du moteur et de ses packages système. Un

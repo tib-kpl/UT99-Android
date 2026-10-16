@@ -2635,6 +2635,11 @@ public:
     class AMutator* NextMutator;
     class AMutator* NextDamageMutator;
     class UClass* DefaultWeapon;
+#if defined(PLATFORM_ANDROID)
+    // Runtime extensions to the v400 script layout (see UStruct::Link).
+    class AMutator* NextHUDMutator;
+    BITFIELD bHUDMutator:1;
+#endif
     void eventPostRender(class UCanvas* Canvas)
     {
         AMutator_eventPostRender_Parms Parms;

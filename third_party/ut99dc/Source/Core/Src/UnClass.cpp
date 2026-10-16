@@ -370,6 +370,34 @@ void UStruct::Link( FArchive& Ar, UBOOL Props )
 {
 	guard(UStruct::Link);
 
+#if defined(PLATFORM_ANDROID)
+	// Extend the matching v400 Mutator in memory, without modifying Engine.u
+	// or its export indices/GUID. Bonus-pack scripts import these HUD fields.
+	if( Props && Ar.IsLoading() && Ar.Ver()==68
+	&& appStricmp(GetName(),TEXT("Mutator"))==0
+	&& GetOuter() && appStricmp(GetOuter()->GetName(),TEXT("Engine"))==0 )
+	{
+		UField** Tail = &Children;
+		UBOOL HasNextHUD=0, HasHUDFlag=0;
+		while( *Tail )
+		{
+			Ar.Preload(*Tail);
+			HasNextHUD |= appStricmp((*Tail)->GetName(),TEXT("NextHUDMutator"))==0;
+			HasHUDFlag |= appStricmp((*Tail)->GetName(),TEXT("bHUDMutator"))==0;
+			Tail = &(*Tail)->Next;
+		}
+		if( !HasNextHUD )
+		{
+			UObjectProperty* P = new(this,TEXT("NextHUDMutator"),RF_Public|RF_Native|RF_Transient)UObjectProperty;
+			P->PropertyClass = CastChecked<UClass>(this);
+			*Tail = P;
+			Tail = &P->Next;
+		}
+		if( !HasHUDFlag )
+			*Tail = new(this,TEXT("bHUDMutator"),RF_Public|RF_Native|RF_Transient)UBoolProperty;
+	}
+#endif
+
 	// Link the properties.
 	guard(LinkProperties);
 	if( Props )
