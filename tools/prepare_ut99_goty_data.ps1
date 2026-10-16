@@ -51,7 +51,7 @@ Get-ChildItem -LiteralPath (Join-Path $base 'System') -File | Where-Object {
 # These scripts load with the Android compatibility runtime. Relics needs its
 # HUD field extensions and PCM resampling; it does not load in unmodified v400.
 # The remaining modern System packages require separate compatibility work.
-foreach ($name in @('de','epiccustommodels','multimesh','relics','relicsbindings')) {
+foreach ($name in @('de','epiccustommodels','multimesh','relics','relicsbindings','skeletalchars')) {
     foreach ($extension in @('.u','.int','.frt')) {
         $file = Join-Path $goty ('System/'+$name+$extension)
         if (Test-Path -LiteralPath $file -PathType Leaf) {
@@ -62,7 +62,7 @@ foreach ($name in @('de','epiccustommodels','multimesh','relics','relicsbindings
 # Recent installations keep registrations/translations outside System. Copy
 # only the supported bonus packages and their skins, preserving the classic
 # core/interface localization files.
-foreach ($name in @('de','epiccustommodels','multimesh','relics','relicsbindings','tnalimeshskins','tcowmeshskins','tskmskins')) {
+foreach ($name in @('de','epiccustommodels','multimesh','relics','relicsbindings','skeletalchars','tnalimeshskins','tcowmeshskins','tskmskins')) {
     foreach ($language in @('int','frt')) {
         $filename=$name+'.'+$language
         foreach ($relative in @(('System/'+$filename),('SystemLocalized/'+$language+'/'+$filename))) {
@@ -79,8 +79,8 @@ $report = [pscustomobject]@{
     CompatibleSystem=$base
     GotyContent=$goty
     Scope='GOTY maps, textures, sounds and music with v400-compatible System packages. This does not install the OldUnreal 469 engine or all its script/gameplay changes.'
-    AdditionalScriptPackages=@('de','epiccustommodels','multimesh','relics','relicsbindings')
-    RequiredAndroidFeatures=@('MutatorHUDFields','PCMResampling','ExtraKeyBindings','UTF8RegistrationBOM')
+    AdditionalScriptPackages=@('de','epiccustommodels','multimesh','relics','relicsbindings','skeletalchars')
+    RequiredAndroidFeatures=@('MutatorHUDFields','PCMResampling','ExtraKeyBindings','UTF8RegistrationBOM','SkeletalBonusPoses')
     Content=$content
 }
 [IO.File]::WriteAllText((Join-Path $output 'android-compatibility.json'),($report | ConvertTo-Json -Depth 4),(New-Object Text.UTF8Encoding $false))

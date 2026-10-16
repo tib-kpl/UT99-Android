@@ -839,6 +839,13 @@ public:
 			SavedAr->DetachLazyLoader( this );
 		unguard;
 	}
+    // Generated runtime poses must never be replaced by the source lazy data.
+    void DetachSource()
+    {
+        if(SavedAr) SavedAr->DetachLazyLoader(this);
+        SavedAr=NULL;
+        SavedPos=0;
+    }
 #if LOAD_ON_DEMAND /* Breaks because of untimely accesses of operator() !! */
     T& operator()( INT i )
 	{

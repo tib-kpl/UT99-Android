@@ -641,6 +641,23 @@ class ULinkerLoad : public ULinker, public FArchive
 		}
 
 #if defined(PLATFORM_ANDROID)
+        // Bonus-pack characters reference the later Botpack.MaleSounds group.
+        // Retail v400 keeps exactly those sounds in the separate MaleSounds
+        // package. Resolve that one group without modifying either package.
+        if(Import.SourceIndex==INDEX_NONE && !Import.XObject && Import.PackageIndex<0
+        && Import.ClassPackage==NAME_Core && Import.ClassName==NAME_Package
+        && appStricmp(*Import.ObjectName,TEXT("MaleSounds"))==0)
+        {
+            const FObjectImport& Parent=ImportMap(-Import.PackageIndex-1);
+            if(Parent.PackageIndex==0 && Parent.ClassName==NAME_Package
+            && appStricmp(*Parent.ObjectName,TEXT("Botpack"))==0)
+            {
+                UPackage* Audio=CreatePackage(NULL,TEXT("MaleSounds"));
+                Import.SourceLinker=GetPackageLinker(Audio,NULL,LOAD_Throw|(LoadFlags&LOAD_Propagate),NULL,NULL);
+                Import.XObject=Audio;
+                GImportCount++;
+            }
+        }
 		// Only the two explicitly supported runtime fields may be resolved
 		// outside the on-disk v400 export table. All other imports stay strict.
 		if( Import.SourceIndex==INDEX_NONE && Import.PackageIndex<0 && Pkg

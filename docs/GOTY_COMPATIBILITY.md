@@ -27,8 +27,8 @@ contenu dans l'installation GOTY. Les packages supplémentaires `de`,
 Les packages modernes
 `Core`, `Engine`, `Botpack`, les interfaces et les autres packages système
 ne sont pas substitués : ils nécessitent encore un portage distinct.
-Les modèles squelettiques et les fonctionnalités propres au moteur 469
-nécessitent encore des adaptations. Relics demande les extensions Android
+Les fonctionnalités propres au moteur 469 nécessitent encore des adaptations.
+Relics et les personnages squelettiques demandent les extensions Android
 décrites ci-dessous, présentes dans cette branche.
 
 ### Personnages bonus MultiMesh
@@ -71,21 +71,45 @@ relique de régénération aux deux clients d'un serveur 469. Les clients ARM64
 et ARMv7 reçoivent la relique, affichent son icône et atteignent la santé 150
 confirmée par le serveur.
 
-`RelicsBindings` est ?galement inclus. Une classe native de m?tadonn?es
+`RelicsBindings` est également inclus. Une classe native de métadonnées
 `UTMenu.UTExtraKeyBindings` permet de charger son package original sans
-modifier `UTMenu.u`. Le menu Commandes ajoute les actions d?clar?es par les
-mods et conserve leurs commandes compl?tes, notamment `mutate tossrelic`,
-lors de l?affectation et de la relecture des touches. Le lecteur de
-configuration ignore la marque UTF-8 initiale des fichiers r?cents pour
-reconna?tre leur premi?re section `[public]`. Le sc?nario isol?
-`tools/menu_audit/Classes/ExtraBindingsAudit.uc` v?rifie ces ?tapes et la
-r?ouverture sans doublon sur ARM64 et ARMv7, puis restaure la touche de test.
+modifier `UTMenu.u`. Le menu Commandes ajoute les actions déclarées par les
+mods et conserve leurs commandes complètes, notamment `mutate tossrelic`,
+lors de l'affectation et de la relecture des touches. Le lecteur de
+configuration ignore la marque UTF-8 initiale des fichiers récents pour
+reconnaître leur première section `[public]`. Le scénario isolé
+`tools/menu_audit/Classes/ExtraBindingsAudit.uc` vérifie ces étapes et la
+réouverture sans doublon sur ARM64 et ARMv7, puis restaure la touche de test.
 
-`SkeletalChars`
-demande les objets audio déplacés dans Botpack, mais aussi les types natifs
-`SkeletalMesh` et `Animation`, absents du moteur actuel. Leur prise en charge
-ne se résume donc pas à un remplacement de référence audio. Le garde-fou sur
-les packages système reste actif.
+### Personnages squelettiques du bonus pack
+
+Le moteur Android charge maintenant les objets `Animation` et `SkeletalMesh`
+de `SkeletalChars.u` original. Les 68 séquences sont échantillonnées au
+chargement en 1077 poses pour le rendu LOD v400 existant. Les os sont reliés
+par leur nom, les rotations interpolées par quaternion et les influences
+pondérées appliquées aux points locaux. L'arme utilise trois points d'attache
+produits à partir de l'os de la main et du réglage original du maillage.
+Les poses générées sont détachées du chargement différé pour éviter qu'un
+rechargement du fichier ne les remplace par les tableaux source vides.
+
+Cette adaptation garde l'interpolation de sommets et la précision des
+sommets v400 entre les poses ; elle n'implémente pas le système d'animation
+squelettique complet du moteur 469 ni les extensions de mods ultérieures.
+Elle prend en charge le format des deux personnages du bonus pack, sans
+modifier le package, son GUID ou ses indices d'objets. Un alias limité à
+`Botpack.MaleSounds` résout les sons correspondants dans le package v400
+`MaleSounds`, sans remplacer Botpack.
+
+`UT99PhysicsAudit.SkeletalModelsAudit` contrôle le chargement des classes
+Xan Mk2 et War Boss, puis leurs animations de repos, course et mort, avec
+leurs textures. Ces scènes ont été vérifiées en ARM64 et ARMv7. Le scénario
+n'est pas intégré à l'APK. Deux clients utilisant les classes originales ont
+également rejoint le serveur 469 isolé : HUD, armes, adversaire et tirs sont
+visibles ; la santé des deux joueurs passe de 100 à 50 côté serveur.
+Ce test ne certifie pas tous les mods ou protections des serveurs publics.
+
+La préparation inclut maintenant `SkeletalChars` et ses déclarations. Les
+packages système modernes restent exclus et leur garde-fou reste actif.
 
 ### Compatibilité réseau
 
