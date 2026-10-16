@@ -67,7 +67,7 @@ option du menu. B et Start conservent leurs chemins de retour dédiés.
 ## Compilation
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools/build_console_menu.ps1 -GameDirectory C:\UnrealTournament
+powershell -ExecutionPolicy Bypass -File tools/build_console_menu.ps1 -GameDirectory "<installation-UT99-v400>"
 .\gradlew.bat assembleNormalDebug --offline --no-configuration-cache
 ```
 

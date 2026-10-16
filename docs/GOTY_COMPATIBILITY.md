@@ -11,8 +11,8 @@ préparés avec les packages système v400 correspondant au moteur Android :
 
 ```powershell
 ./tools/prepare_ut99_goty_data.ps1 `
-  -CompatibleGameDirectory C:\UnrealTournament `
-  -GotyDirectory H:\Jeux\UnrealTournament `
+  -CompatibleGameDirectory "<installation-UT99-v400>" `
+  -GotyDirectory "<installation-UT99-GOTY>" `
   -OutputDirectory ./build/goty-android-data
 ```
 
@@ -40,8 +40,8 @@ mais ne remplace pas une partie jouée sur Android :
 
 ```powershell
 ./tools/audit_ut99_content.ps1 `
-  -EngineDirectory C:\UnrealTournament `
-  -ContentDirectory H:\Jeux\UnrealTournament
+  -EngineDirectory "<installation-UT99-v400>" `
+  -ContentDirectory "<installation-UT99-GOTY>"
 ```
 
 Le rapport est écrit dans `build/goty-content-audit/report.json`.
@@ -94,7 +94,7 @@ dans ses [notes officielles](https://github.com/OldUnreal/UnrealTournamentPatche
 ### Régression reproductible
 
 ```powershell
-./tools/build_ut99_physics_audit.ps1 -GameDirectory C:\UnrealTournament
+./tools/build_ut99_physics_audit.ps1 -GameDirectory "<installation-UT99-v400>"
 ```
 
 Le package produit est `build/physics-audit/System/UT99PhysicsAudit.u`.
