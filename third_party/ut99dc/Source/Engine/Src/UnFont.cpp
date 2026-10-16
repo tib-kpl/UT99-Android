@@ -14,6 +14,7 @@
 ------------------------------------------------------------------------------*/
 
 UFont::UFont()
+	: HasGlyphMap(0)
 {}
 
 void UFont::Serialize( FArchive& Ar )
@@ -23,6 +24,10 @@ void UFont::Serialize( FArchive& Ar )
 	UBOOL GSavedLazyLoad = GLazyLoad;
 	GLazyLoad = 1;
 	Ar << Pages << CharactersPerPage;
+	// Version 69 fonts append a UTF-16 character-to-glyph map and its flag.
+	// Keep glyph indices as integers: even ANSI text can address glyphs >255.
+	if( Ar.Ver() >= 69 )
+		Ar << GlyphMap << HasGlyphMap;
 	check(!(CharactersPerPage&(CharactersPerPage-1)));
 	if( !GLazyLoad )
 		for( INT c=0,p=0; c<256; c+=CharactersPerPage,p++ )

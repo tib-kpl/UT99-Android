@@ -470,6 +470,15 @@ class ENGINE_API UFont : public UObject
 	// Variables.
 	INT CharactersPerPage;
 	TArray<FFontPage> Pages;
+	TMap<_WORD,_WORD> GlyphMap;
+	UBOOL HasGlyphMap;
+
+	INT GlyphIndex(INT Character)
+	{
+		if( !HasGlyphMap ) return Character;
+		_WORD* Index = GlyphMap.Find((_WORD)Character);
+		return Index ? *Index : 32;
+	}
 
 	// Constructors.
 	UFont();

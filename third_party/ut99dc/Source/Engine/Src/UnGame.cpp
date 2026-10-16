@@ -450,7 +450,7 @@ static void UT99AndroidMeasureScaledText( UFont* Font, const TCHAR* Text, FLOAT 
 	UBOOL bHaveCharacter = 0;
 	for( INT i=0; Text[i]; i++ )
 	{
-		INT Ch    = (TCHARU)Text[i];
+		INT Ch    = Font->GlyphIndex((TCHARU)Text[i]);
 		INT Page  = Ch / Font->CharactersPerPage;
 		INT Index = Ch - Page * Font->CharactersPerPage;
 		if( Page<Font->Pages.Num() && Index<Font->Pages(Page).Characters.Num() )

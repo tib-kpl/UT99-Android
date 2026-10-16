@@ -288,7 +288,7 @@ static void UT99AndroidGetStockCharSize( UFont* Font, TCHAR InCh, INT& Width, IN
 {
 	Width=Height=0;
 	if( !Font ) return;
-	INT Ch=(TCHARU)InCh;
+	INT Ch=Font->GlyphIndex((TCHARU)InCh);
 	INT Page=Ch/Font->CharactersPerPage;
 	INT Index=Ch-Page*Font->CharactersPerPage;
 	if( Page<Font->Pages.Num() && Index<Font->Pages(Page).Characters.Num() )
@@ -437,6 +437,7 @@ static inline INT DrawString
 #endif
 
 		// Process character if it's valid.
+		Ch = Font->GlyphIndex(Ch);
 		INT NewPage = Ch / Font->CharactersPerPage;
 		UTexture* Tex;
 		if( NewPage<Font->Pages.Num() && (Tex=Font->Pages(NewPage).Texture)!=NULL )
@@ -473,7 +474,7 @@ static inline INT DrawString
                 // The retail UTFont40 'i' rectangle includes column 206 of
                 // Texture28: the neighbouring 'j' descender. Keep its advance,
                 // but exclude that final column from the drawing rectangle.
-                if(Ch == 'i' && appStricmp(Font->GetName(), TEXT("UTFont40")) == 0)
+                if(!Font->HasGlyphMap && Ch == 'i' && appStricmp(Font->GetName(), TEXT("UTFont40")) == 0)
                     CUSize = Max(0, CUSize-1);
 #endif
 
@@ -532,7 +533,7 @@ static inline void GetCharSize( UFont* Font, TCHAR InCh, INT& Width, INT& Height
 #else
 	Width = 0;
 	Height = 0;
-	INT Ch    = (TCHARU)InCh;
+	INT Ch    = Font->GlyphIndex((TCHARU)InCh);
 	INT Page  = Ch / Font->CharactersPerPage;
 	INT Index = Ch - Page * Font->CharactersPerPage;
 	if( Page<Font->Pages.Num() && Index<Font->Pages(Page).Characters.Num() )

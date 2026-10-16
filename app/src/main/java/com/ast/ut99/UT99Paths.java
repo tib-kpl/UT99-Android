@@ -105,7 +105,7 @@ final class UT99Paths {
         return isSupportedV400Package(new File(system, "Core.u"))
                 && isSupportedV400Package(new File(system, "Engine.u"))
                 && isSupportedV400Package(new File(system, "Botpack.u"))
-                && isSupportedV400Package(new File(maps, "CityIntro.unr"));
+                && isSupportedContentPackage(new File(maps, "CityIntro.unr"));
     }
 
     private static void mergeCaseVariantDirectory(File root, String canonicalName) throws IOException {
@@ -302,6 +302,16 @@ final class UT99Paths {
     }
 
     private static boolean isSupportedV400Package(File file) {
+        return hasPackageVersion(file, UT_V400_PACKAGE_VERSION, UT_V400_PACKAGE_VERSION);
+    }
+
+    private static boolean isSupportedContentPackage(File file) {
+        // Map serialization supports retail/GOTY versions through 69. This does
+        // not relax the exact version required for native-bound System packages.
+        return hasPackageVersion(file, 60, 69);
+    }
+
+    private static boolean hasPackageVersion(File file, int minimum, int maximum) {
         if (file == null || !file.isFile() || file.length() < 8) {
             return false;
         }
@@ -327,7 +337,7 @@ final class UT99Paths {
                     | ((header[5] & 0xff) << 8)
                     | ((header[6] & 0xff) << 16)
                     | ((header[7] & 0xff) << 24);
-            return tag == UT_PACKAGE_TAG && version == UT_V400_PACKAGE_VERSION;
+            return tag == UT_PACKAGE_TAG && version >= minimum && version <= maximum;
         } catch (IOException ignored) {
             return false;
         } finally {

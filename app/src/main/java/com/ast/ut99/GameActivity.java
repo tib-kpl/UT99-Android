@@ -461,8 +461,23 @@ public class GameActivity extends SDLActivity {
      */
     @Override
     protected String[] getArguments() {
+        String testUrl = "CityIntro.unr";
+        // Debug APKs can start a reproducible physics fixture without changing
+        // the normal launcher or the release APK's command line.
+        if (BuildConfig.DEBUG) {
+            java.io.File urlFile = new java.io.File(dataRoot, "physics-test-url.txt");
+            if (urlFile.isFile()) {
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(new java.io.FileInputStream(urlFile), "UTF-8"))) {
+                    String value = reader.readLine();
+                    if (value != null && !value.trim().isEmpty() && value.length() <= 512) testUrl = value.trim();
+                } catch (java.io.IOException e) {
+                    Log.w(TAG, "Cannot read debug physics fixture URL", e);
+                }
+            }
+        }
         return new String[] {
-                "CityIntro.unr",
+                testUrl,
                 "LOG=UT99Android.log",
                 "INI=AndroidUT99.ini",
                 "USERINI=AndroidUser.ini"

@@ -9,6 +9,41 @@
 
 #include "EnginePrivate.h"
 
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+// Opt-in diagnostics for intermittent movement issues. Never change collision
+// responses here: record the attempted move and the primitive that rejected it.
+static void AndroidTracePawnMovement(APawn* Pawn, const FVector& Start, const FVector& AttemptedAcceleration, BYTE PreviousPhysics, FLOAT DeltaSeconds)
+{
+	static UBOOL Initialized=0, Enabled=0;
+	if( !Initialized )
+	{
+		Initialized=1;
+		if( GConfig ) GConfig->GetBool(TEXT("Engine.GameEngine"), TEXT("AndroidCollisionDiagnostics"), Enabled);
+	}
+	if( !Enabled || Pawn->bDeleteMe || Pawn->Health<=0 ) return;
+	static DOUBLE NextReport[64] = {0};
+	const INT Slot = Pawn->GetIndex() % ARRAY_COUNT(NextReport);
+	const DOUBLE Now = appSeconds();
+	if( Now < NextReport[Slot] ) return;
+	const UBOOL IsLocalPlayer = Pawn->IsA(APlayerPawn::StaticClass()) && Cast<UViewport>(((APlayerPawn*)Pawn)->Player)!=NULL;
+	const UBOOL Stalled = (PreviousPhysics==PHYS_Walking || PreviousPhysics==PHYS_Falling)
+		&& AttemptedAcceleration.SizeSquared()>100 && (Pawn->Location-Start).SizeSquared2D()<0.01;
+	if( !Stalled && !IsLocalPlayer ) return;
+	NextReport[Slot] = Now + (Stalled ? 0.25 : 1.0);
+	FVector Direction = AttemptedAcceleration; Direction.Z=0; Direction=Direction.SafeNormal();
+	FCheckResult Forward(1), Floor(1);
+	Pawn->GetLevel()->SingleLineCheck(Forward, Pawn, Pawn->Location + Direction*32, Pawn->Location, TRACE_AllColliding, Pawn->GetCylinderExtent());
+	Pawn->GetLevel()->SingleLineCheck(Floor, Pawn, Pawn->Location - FVector(0,0,64), Pawn->Location, TRACE_AllColliding, Pawn->GetCylinderExtent());
+	debugf(TEXT("AndroidCollision pawn=%s stalled=%i dt=%.6f loc=(%.4f,%.4f,%.4f) accel=(%.2f,%.2f,%.2f) physics=%i/%i walk=%i radius=%.2f height=%.2f forward=%s time=%.5f normal=(%.4f,%.4f,%.4f) floor=%s floorNormal=(%.4f,%.4f,%.4f)"),
+		Pawn->GetName(), Stalled, DeltaSeconds, Pawn->Location.X, Pawn->Location.Y, Pawn->Location.Z,
+		AttemptedAcceleration.X, AttemptedAcceleration.Y, AttemptedAcceleration.Z, PreviousPhysics, Pawn->Physics,
+		Pawn->bIsWalking, Pawn->CollisionRadius, Pawn->CollisionHeight,
+		Forward.Actor ? Forward.Actor->GetName() : TEXT("None"), Forward.Time,
+		Forward.Normal.X, Forward.Normal.Y, Forward.Normal.Z,
+		Floor.Actor ? Floor.Actor->GetName() : TEXT("None"), Floor.Normal.X, Floor.Normal.Y, Floor.Normal.Z);
+}
+#endif
+
 void AActor::execMoveSmooth( FFrame& Stack, RESULT_DECL )
 {
 	guardSlow(AActor::execMoveSmooth);
@@ -175,6 +210,10 @@ void APawn::performPhysics(FLOAT DeltaSeconds)
 	guard(APawn::performPhysics);
 
 	FVector OldVelocity = Velocity;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	const FVector DiagnosticStart = Location, DiagnosticAcceleration = Acceleration;
+	const BYTE DiagnosticPhysics = Physics;
+#endif
 
 	// change position
 	switch (Physics)
@@ -197,6 +236,10 @@ void APawn::performPhysics(FLOAT DeltaSeconds)
 	if ( (Physics != PHYS_Spider) 
 			&& (IsA(APlayerPawn::StaticClass()) || (Rotation != DesiredRotation) || (RotationRate.Roll > 0)) ) 
 		physicsRotation(DeltaSeconds, OldVelocity);
+
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	AndroidTracePawnMovement(this, DiagnosticStart, DiagnosticAcceleration, DiagnosticPhysics, DeltaSeconds);
+#endif
 
 	MoveTimer -= DeltaSeconds;
 	AvgPhysicsTime = 0.8 * AvgPhysicsTime + 0.2 * DeltaSeconds;
@@ -829,7 +872,24 @@ void APawn::physWalking(FLOAT deltaTime, INT Iterations)
 			if (Hit.Time < 1.0) //try to step up
 			{
 				FVector DesiredDir = Delta.SafeNormal();
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+				const FVector StepStart = Location;
+				const FVector OriginalWallNormal = Hit.Normal;
+				const FVector RemainingDelta = Delta * (1.0 - Hit.Time);
+#endif
 				stepUp(GravDir, DesiredDir, Delta * (1.0 - Hit.Time), Hit);
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+				// A failed step can hit a low ceiling's leading edge after the
+				// upward move. Slide along the original wall at floor height;
+				// using that ceiling edge as the wall normal traps diagonal input.
+				if( Physics==PHYS_Walking && Abs(OriginalWallNormal.Z)<0.2f
+					&& (Location-StepStart).SizeSquared2D()<0.01f )
+				{
+					const FVector Slide = RemainingDelta - OriginalWallNormal * (RemainingDelta | OriginalWallNormal);
+					if( !Slide.IsNearlyZero() && (Slide | RemainingDelta)>0.f )
+						GetLevel()->MoveActor(this, Slide, Rotation, Hit);
+				}
+#endif
 				if ( Physics == PHYS_Falling ) // pawn decided to jump up
 				{
 					FLOAT DesiredDist = subMove.Size();

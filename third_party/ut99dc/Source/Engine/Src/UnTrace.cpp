@@ -667,10 +667,18 @@ UBOOL UModel::LineCheck
 			FBoxLineCheckInfo Trace( Hit, *this, Owner, End, Start, Extent, ExtraNodeFlags );
 			Trace.BoxLineCheck( 0, 0, 0, RootOutside );
 
-			// Truncate by the greater of 10% or 0.1 world units.
+			// Leave a small clearance before the blocking surface.
 			if( Trace.DidHit )
 			{
+				#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+				// Keep the collision skin in world units. A minimum of 10% of
+				// the sweep length lifts walking pawns off descending floors and
+				// makes them hit the leading edge of low ceilings as a wall.
+				const FLOAT Backoff = Trace.Dist > SMALL_NUMBER ? 0.1f/Trace.Dist : 0.f;
+				Hit.Time = Clamp(Hit.Time - Backoff, 0.f, 1.f);
+				#else
 				Hit.Time      = Clamp( Hit.Time - ::Max(0.1f, 0.1f/Trace.Dist),0.f, 1.f );
+				#endif
 				Hit.Location  = Start + (End-Start) * Hit.Time;
 				return Hit.Time==1.0;
 			}
