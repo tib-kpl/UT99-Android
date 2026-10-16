@@ -108,7 +108,20 @@ void UNetConnection::Destroy()
 
 	// Kill all channels.
 	for( INT i=OpenChannels.Num()-1; i>=0; i-- )
+#if defined(PLATFORM_ANDROID)
+    {
+        // RouteDestroy can enter this connection from an unreachable channel's
+        // ConditionalDestroy stack. Deleting that channel here would free it
+        // before the outer call returns. During GC, dispatch destruction now
+        // and let PurgeGarbage's deletion phase release the channel storage.
+        if(GetFlags() & RF_Unreachable)
+            OpenChannels(i)->ConditionalDestroy();
+        else
+            delete OpenChannels(i);
+    }
+#else
 		delete OpenChannels(i);
+#endif
 
 	// Kill package map.
 	delete PackageMap;
@@ -909,7 +922,21 @@ void UNetConnection::ReceiveFile( INT PackageIndex )
 	FPackageInfo& Info = PackageMap->List( PackageIndex );
 
 	// Create channel.
-	UFileChannel* Ch = (UFileChannel *)CreateChannel( CHTYPE_File, 1 );
+    INT FileChannelIndex=INDEX_NONE;
+#if defined(PLATFORM_ANDROID)
+    // An HTTP failure can request the next file just after the previous file
+    // channel was destroyed locally, while its close is still pending at the
+    // server. Prefer a never-used slot in this connection so that the new open
+    // cannot be consumed by the old closing channel. Synchronous v400 downloads
+    // avoided this race because they opened the next channel inside Destroy().
+    for(INT Index=1; Index<MAX_CHANNELS; Index++)
+        if(!Channels[Index] && !OutReliable[Index] && !InReliable[Index])
+        {
+            FileChannelIndex=Index;
+            break;
+        }
+#endif
+	UFileChannel* Ch = (UFileChannel *)CreateChannel( CHTYPE_File, 1, FileChannelIndex );
 	if( !Ch )
 	{
 		Driver->Notify->NotifyReceivedFile( this, PackageIndex, LocalizeError("ChAllocate") );
@@ -918,6 +945,9 @@ void UNetConnection::ReceiveFile( INT PackageIndex )
 
 	// Set channel properties.
 	Ch->PackageIndex = PackageIndex;
+#if defined(PLATFORM_ANDROID)
+    debugf(NAME_Log,TEXT("Android download: file request package=%s channel=%i"),Info.Parent->GetName(),Ch->ChIndex);
+#endif
 	appStrcpy( Ch->PrettyName, PackageMap->List(PackageIndex).Parent->GetName() );
 
 	// Send file request.

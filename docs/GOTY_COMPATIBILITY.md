@@ -129,6 +129,39 @@ repli et la réception de la bonne carte. Ces essais ne constituent pas une
 mesure du débit d'un serveur Internet. Sans miroir configuré par le serveur,
 le téléchargement conserve le canal historique et ses limites.
 
+Les replis successifs HTTP vers le canal fichier pouvaient bloquer la
+connexion sur un package : le canal précédent était déjà libéré sur Android
+mais encore en cours de fermeture côté serveur. La requête suivante pouvait
+réutiliser ce même numéro trop tôt. Android préfère désormais un numéro de
+canal encore inutilisé dans cette connexion. Les requêtes consécutives restent
+ainsi distinctes pendant la fermeture des transferts précédents.
+
+Les transitions répétées ont également exposé une libération prématurée de
+canal pendant le ramasse-miettes. `RouteDestroy` pouvait déclencher le nettoyage
+de sa connexion, qui supprimait ce même canal alors que son appel de destruction
+était encore actif. Pendant ce nettoyage, Android appelle désormais la destruction
+conditionnelle des canaux et laisse leur libération physique à la phase suivante
+du ramasse-miettes. La suppression immédiate hors de ce cas reste inchangée.
+
+Le scénario `UT99PhysicsAudit.NetworkTravelAudit` a fait suivre trois cartes
+à deux clients, ARM64 et ARMv7, sur le serveur 469 isolé. La carte intermédiaire
+est une copie de test de Crane avec un GUID distinct, absente des consoles.
+Elle est reçue par HTTP ; deux textures absentes du miroir déclenchent ensuite
+deux replis vers le canal fichier. Les six fichiers reçus sur les deux clients
+correspondent aux SHA-256 des sources. Les clients retrouvent leur HUD et leur
+arme sur chaque carte, puis leur adversaire au retour sur Oblivion. Les
+scénarios et fichiers du jeu restent exclus de l'APK ; les journaux privés
+restent dans `build`.
+
+Une seconde rotation avec le cache rempli termine également les trois étapes,
+sans réception HTTP ou fichier supplémentaire. Ce contrôle reproduisait le
+crash de nettoyage avant la correction de durée de vie des canaux.
+
+`tools/check_ut99_network_travel_audit.ps1` vérifie les trois étapes dans les
+journaux serveur et clients ; `-ColdDownloads` exige aussi la réception HTTP
+de la carte et les deux numéros de canal distincts pour les textures.
+`-WarmCache` exige au contraire l'absence de nouvelles demandes de fichiers.
+
 Le test JVM `tools/java_tests/RedirectDownloadAudit.java` prend un package
 local et son fichier `.uz` produit par UCC. Il vérifie l'identité des données,
 la redirection HTTP, les entrées tronquées, mille flux malformés, le code 404,
