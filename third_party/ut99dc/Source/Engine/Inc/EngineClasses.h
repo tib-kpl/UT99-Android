@@ -1818,6 +1818,9 @@ public:
         Parms.bItems=bItems;
         ProcessEvent(FindFunctionChecked(ENGINE_ClientTravel),&Parms);
     }
+#if defined(PLATFORM_ANDROID)
+    FLOAT LastMessageWindow;
+#endif
     DECLARE_CLASS(APlayerPawn,APawn,0|CLASS_Config|CLASS_NativeReplication)
     #include "APlayerPawn.h"
 };
@@ -2639,6 +2642,8 @@ public:
     // Runtime extensions to the v400 script layout (see UStruct::Link).
     class AMutator* NextHUDMutator;
     BITFIELD bHUDMutator:1;
+    class AMutator* NextMessageMutator;
+    DECLARE_FUNCTION(execRegisterHUDMutator);
 #endif
     void eventPostRender(class UCanvas* Canvas)
     {
@@ -3231,6 +3236,9 @@ AUTOGENERATE_FUNCTION(AStatLog,-1,execGetMapFileName);
 AUTOGENERATE_FUNCTION(AStatLog,-1,execGetGMTRef);
 AUTOGENERATE_FUNCTION(AStatLog,-1,execGetPlayerChecksum);
 AUTOGENERATE_FUNCTION(AStatLog,-1,execLogMutator);
+#if defined(PLATFORM_ANDROID)
+AUTOGENERATE_FUNCTION(AMutator,-1,execRegisterHUDMutator);
+#endif
 AUTOGENERATE_FUNCTION(AStatLog,-1,execInitialCheck);
 AUTOGENERATE_FUNCTION(AStatLog,-1,execBrowseRelativeLocalURL);
 AUTOGENERATE_FUNCTION(AStatLog,-1,execExecuteWorldLogBatcher);

@@ -725,6 +725,9 @@ void UActorChannel::ReceivedBunch( FInBunch& Bunch )
 
 	// Initialize client if first time through.
 	FClassNetCache* ClassCache = NULL;
+#if defined(PLATFORM_ANDROID)
+	const UBOOL InitialClientActor = Actor==NULL && Connection->Driver->ServerConnection;
+#endif
 	if( Actor==NULL )
 	{
 		guard(InitialClientActor);
@@ -919,6 +922,16 @@ void UActorChannel::ReceivedBunch( FInBunch& Bunch )
 	}
 	unguard;
 
+#if defined(PLATFORM_ANDROID)
+	// Later mods use this event to initialize from replicated properties. It
+	// must run once, after the opening bunch, rather than during SpawnActor.
+	if( InitialClientActor && Actor && !Actor->bDeleteMe )
+	{
+		UFunction* Event = Actor->FindFunction(FName(TEXT("PostNetBeginPlay")));
+		if( Event ) Actor->ProcessEvent(Event,NULL);
+	}
+	if( !Actor || Actor->bDeleteMe ) return;
+#endif
 	// If this is the player's channel and the connection was pending, mark it open.
 	if
 	(	Connection->Driver

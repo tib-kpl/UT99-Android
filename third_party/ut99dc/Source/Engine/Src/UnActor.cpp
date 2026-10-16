@@ -9,6 +9,44 @@
 #include "EnginePrivate.h"
 #include "UnNet.h"
 
+#if defined(PLATFORM_ANDROID)
+void AMutator::execRegisterHUDMutator(FFrame& Stack, RESULT_DECL)
+{
+	guard(AMutator::execRegisterHUDMutator);
+	P_FINISH;
+	ULevel* Level=GetLevel();
+	if(!Level) return;
+	for(INT i=0;i<Level->Actors.Num();i++)
+	{
+		APlayerPawn* P=Cast<APlayerPawn>(Level->Actors(i));
+		if(!P || !P->myHUD || P->bDeleteMe) continue;
+		AHUD* HUD=P->myHUD;
+		TArray<AMutator*> Visited;
+		AMutator* Previous=NULL;
+		AMutator* M=HUD->HUDMutator;
+		UBOOL Registered=0;
+		while(M)
+		{
+			if(M==this) { Registered=1; break; }
+			if(Visited.FindItemIndex(M)!=INDEX_NONE)
+			{
+				// Repair an existing cycle before prepending this mutator.
+				if(Previous) Previous->NextHUDMutator=NULL;
+				break;
+			}
+			Visited.AddItem(M); Previous=M; M=M->NextHUDMutator;
+		}
+		if(!Registered)
+		{
+			NextHUDMutator=HUD->HUDMutator;
+			HUD->HUDMutator=this;
+			bHUDMutator=1;
+		}
+	}
+	unguard;
+}
+#endif
+
 /*-----------------------------------------------------------------------------
 	AActor object implementations.
 -----------------------------------------------------------------------------*/

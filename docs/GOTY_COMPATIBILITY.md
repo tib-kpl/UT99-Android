@@ -337,6 +337,24 @@ Elle ne rejoint pas la partie, ne télécharge aucun fichier et ne démontre pas
 la compatibilité des acteurs. La valeur annoncée par cette sonde sert
 uniquement à comparer les réponses de négociation du serveur.
 
+Les mods de serveurs publics peuvent importer des API apparues après v400,
+même lorsque leurs fonctions ne s'exécutent que côté serveur. Le moteur
+ajoute en mémoire les fonctions de chaînage de `Mutator`, dont
+`HandleEndGame`, `HandleRestartGame`, `HandlePickupQuery`, `PreventDeath`,
+`ModifyLogin` et les filtres de messages, avec leurs signatures et paramètres
+de sortie. Il ajoute aussi `NextMessageMutator`, `RegisterHUDMutator`,
+`Actor.PostNetBeginPlay`, `HUD.ProcessKeyEvent`, `PlayerPawn.LastMessageWindow`
+et les champs de visage/police de `Botpack.ChallengeHUD` attendus par ces mods.
+Les imports ajoutés restent valides entre vérification et chargement effectif
+des packages ; les autres imports restent stricts. Aucun package du jeu
+n'est réécrit. `PostNetBeginPlay` est envoyé sur le client après la réception
+initiale des propriétés, une seule fois par ouverture de canal d'acteur.
+
+Le scénario `tools/network_api_audit` vérifie ces comportements sur un serveur
+récent avec des clients ARM32 et ARM64. Il complète les essais de connexion
+publique ; il ne valide pas toutes les extensions de tous les serveurs.
+Les modules natifs propres à d'autres plateformes restent hors de ce périmètre.
+
 Les pushes sur `feat/oldunreal-goty-compat` compilent deux APK ARMv7/ARM64
 et publient deux releases GitHub normales, sans marqueur de préversion :
 

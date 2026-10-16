@@ -7,6 +7,7 @@
 =============================================================================*/
 
 #include "UT99LoadProfiler.h"
+#include "UnLegacyScriptCompat.h"
 
 /*-----------------------------------------------------------------------------
 	Hash function.
@@ -658,27 +659,24 @@ class ULinkerLoad : public ULinker, public FArchive
                 GImportCount++;
             }
         }
-		// Only the two explicitly supported runtime fields may be resolved
-		// outside the on-disk v400 export table. All other imports stay strict.
-		if( Import.SourceIndex==INDEX_NONE && Import.PackageIndex<0 && Pkg
-		&& Pkg->GetFName()==NAME_Engine
-		&& ((appStricmp(*Import.ObjectName,TEXT("NextHUDMutator"))==0 && Import.ClassName==FName(TEXT("ObjectProperty")))
-		 || (appStricmp(*Import.ObjectName,TEXT("bHUDMutator"))==0 && Import.ClassName==FName(TEXT("BoolProperty")))) )
+		// Resolve only audited v400 API additions, keeping every other import strict.
+		if( Import.SourceIndex==INDEX_NONE && !Import.XObject && Import.PackageIndex<0 && Pkg
+		&& (Pkg->GetFName()==NAME_Engine || Pkg->GetFName()==FName(TEXT("Botpack"))) )
 		{
 			FObjectImport& Parent = ImportMap(-Import.PackageIndex-1);
-			if( Parent.ClassName==NAME_Class && appStricmp(*Parent.ObjectName,TEXT("Mutator"))==0 )
+			if( Parent.ClassName==NAME_Class
+			&& ((Pkg->GetFName()==NAME_Engine && LegacyScriptCompat::Supported(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))
+			 || (Pkg->GetFName()==FName(TEXT("Botpack")) && appStricmp(*Parent.ObjectName,TEXT("ChallengeHUD"))==0
+			   && LegacyScriptCompat::SupportedHUD(Import.ClassName,*Import.ObjectName))) )
 			{
 				UClass* Owner = Cast<UClass>(CreateImport(-Import.PackageIndex-1));
 				if( Owner )
 				{
 					Import.SourceLinker->Preload(Owner);
-					UProperty* Field = FindObject<UProperty>(Owner,*Import.ObjectName);
-					if( Field && Field->GetOuter()==Owner && Field->GetFlags()&RF_Transient
+					UField* Field = FindObject<UField>(Owner,*Import.ObjectName);
+					if( Field && Field->GetOuter()==Owner && (Field->GetFlags()&RF_Transient)
 					&& Field->GetClass()->GetFName()==Import.ClassName )
-					{
-						Import.XObject = Field;
-						GImportCount++;
-					}
+					{ Import.XObject=Field; GImportCount++; }
 				}
 			}
 		}
