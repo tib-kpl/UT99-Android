@@ -1,6 +1,7 @@
 # Menu console UT99
 
-Branche : `feat/console-menu`.
+Branche commune : `master`. Les variantes `normal` (console/téléphone) et
+`classic` (menu UT99 classique) partagent le même moteur et tous ses correctifs.
 
 Orientation obligatoire : paysage. Les activités de lancement et de jeu sont
 verrouillées en `landscape`, et le jeu réapplique ce verrouillage au démarrage.
@@ -147,9 +148,10 @@ les autres personnages et leurs déplacements sont également visibles côté
 client. Le débit négocié dans les journaux est de 20 000. Compilation réussie
 pour ARM64 et ARMv7. Ces essais ne constituent pas un test de longue durée.
 
-Le workflow `.github/workflows/build.yml` publie les builds de `feat/console-menu`
-dans une préversion GitHub distincte, avec un tag `console-menu-<run>-<attempt>`
-et l'APK normal `UT99-Android-<version>-fr-console-menu-normal-release.apk`.
-Il utilise les secrets de signature Android du dépôt, vérifie la signature et
-ne remplace pas la release principale « Latest ». Sans secrets, le fichier porte
-explicitement le suffixe `-unsigned` et nécessite une signature pour installation.
+Le workflow `.github/workflows/build.yml` compile les deux menus ensemble.
+Chaque build réussi de `master` publie une release normale marquée « Latest »,
+avec les deux APK signés : `*-classic-menu-release.apk` et
+`*-console-menu-release.apk`. Les signatures sont vérifiées et la publication
+échoue si la clé manque ou si le moteur et les ressources des variantes
+diffèrent. Voir `tools/check_menu_variants.py`. Les autres branches peuvent
+produire des artefacts de test, mais ne publient pas de release.

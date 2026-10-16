@@ -1,6 +1,7 @@
 # GOTY / OldUnreal : branche expérimentale
 
-Cette branche conserve le moteur Android natif et le menu console. Elle ne
+La branche `master` conserve le moteur Android natif avec deux menus au choix.
+Elle ne
 remplace pas le moteur par la version Linux et ne prétend pas exécuter les
 packages système du moteur OldUnreal 469.
 
@@ -355,14 +356,20 @@ récent avec des clients ARM32 et ARM64. Il complète les essais de connexion
 publique ; il ne valide pas toutes les extensions de tous les serveurs.
 Les modules natifs propres à d'autres plateformes restent hors de ce périmètre.
 
-Les pushes sur `feat/oldunreal-goty-compat` compilent deux APK ARMv7/ARM64
-et publient deux releases GitHub normales, sans marqueur de préversion :
+Les pushes sur `master` compilent deux APK ARMv7/ARM64 et publient une seule
+release GitHub normale `build-<run>-<attempt>`, contenant les deux fichiers :
 
-- `goty-classic-<run>-<attempt>` : menu UT99 classique, variante Gradle `classic` ;
-- `goty-console-<run>-<attempt>` : menu console/téléphone, variante Gradle `normal`.
+- `UT99-Android-<version>-fr-classic-menu-release.apk` : menu UT99 classique,
+  variante Gradle `classic` ;
+- `UT99-Android-<version>-fr-console-menu-release.apk` : menu console/téléphone,
+  variante Gradle `normal`.
 
 Les deux APK partagent le même moteur, les mêmes correctifs et les mêmes
-données de jeu. Seul le choix du menu au lancement change. La CI exige la
+données de jeu. Seul le choix du menu au lancement change. Le contrôle
+`tools/check_menu_variants.py` bloque la publication si leurs fichiers
+diffèrent en dehors du code Java compilé : bibliothèques natives, ressources,
+manifeste et assets doivent être identiques. Les futurs correctifs restent
+communs aux deux variantes, développées ensemble dans `master`. La CI exige la
 clé de signature habituelle avant publication. Les deux variantes conservent
 l'identifiant de l'application principale : installer l'une remplace l'autre
 en conservant les données et rétablit le menu correspondant, même après un

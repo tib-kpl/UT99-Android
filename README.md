@@ -2,6 +2,14 @@
 
 # Unreal Tournament (UT99) Android
 
+Les développements de ce fork sont réunis dans `master`. Chaque
+[release de ce dépôt](https://github.com/tib-kpl/UT99-Android/releases/latest)
+propose deux APK signés : **classic-menu** pour le menu UT99 classique et
+**console-menu** pour le menu console/téléphone. Les deux partagent le même
+moteur, les mêmes correctifs et les mêmes données ; installer une variante
+remplace l'autre en conservant les données. La prise en charge des fichiers
+OldUnreal reste partielle : voir [la compatibilité GOTY](docs/GOTY_COMPATIBILITY.md).
+
 > [!NOTE]
 > **Fork pour la traduction française** de [Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android).
 > - Le jeu passe en français quand l'app est en français (langue du téléphone, ou réglage de langue par app sous Android 13+).
