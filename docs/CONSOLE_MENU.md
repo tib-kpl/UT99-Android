@@ -39,6 +39,9 @@ LAN, Internet et favoris partagent une page dédiée : nom, carte, joueurs et pi
 dix serveurs par page. Gauche/droite change de page sans déplacer la sélection ;
 les boutons tactiles et le numéro de page restent visibles. Recherche, options
 et retour ont un texte légèrement doré pour les distinguer des serveurs.
+LAN et Internet affichent par défaut les serveurs les plus peuplés, puis le
+meilleur ping à population égale. La capacité maximale ne départage pas les
+serveurs avant leur ping ; les serveurs sans réponse restent en fin de liste.
 La recherche filtre le nom, la carte, le type et l'adresse ; les options offrent
 le tri par nom/ping/carte/joueurs et l'actualisation. Les détails d'un serveur
 conservent ses joueurs/règles, copie d'adresse, tests de ping et gestion des
