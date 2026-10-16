@@ -729,7 +729,12 @@ public class GameActivity extends SDLActivity {
             String text = ini.exists() ? ut99V60ReadUtf8(ini) : "";
             String[] consoles = {"UTMenu.UTConsole", "UMenu.UnrealConsole", "UWindow.WindowConsole"};
             for (String section : consoles) {
-                text = ut99V60UpsertKey(text, section, "RootWindow", "UT99ConsoleMenu.UT99ConsoleRoot");
+                text = ut99V60UpsertKey(text, section, "RootWindow", BuildConfig.CONSOLE_MENU
+                        ? "UT99ConsoleMenu.UT99ConsoleRoot" : "UMenu.UMenuRootWindow");
+            }
+            if (!BuildConfig.CONSOLE_MENU) {
+                ut99V60WriteUtf8(ini, text);
+                return;
             }
             text = ut99V60UpsertKey(text, "UT99ConsoleMenu.UT99ConsoleRoot", "LookAndFeelClass", "UMenu.UMenuGoldLookAndFeel");
             boolean hasConsoleScale = java.util.regex.Pattern.compile(

@@ -27,6 +27,14 @@ android {
             minSdk 16
         }
 
+        // Same engine and game data, with the original UT99 desktop menu.
+        classic {
+            dimension 'platform'
+            applicationId 'com.ast.ut99'
+            minSdk 16
+            buildConfigField 'boolean', 'CONSOLE_MENU', 'false'
+        }
+
         // Dedicated Google Play / Android Automotive OS package.
         automotive {
             dimension 'platform'
@@ -46,6 +54,7 @@ android {
     }
 
     defaultConfig {
+        buildConfigField 'boolean', 'CONSOLE_MENU', 'true'
         targetSdk 35
         versionCode 18
         versionName '2.2.1'

@@ -337,8 +337,17 @@ Elle ne rejoint pas la partie, ne télécharge aucun fichier et ne démontre pas
 la compatibilité des acteurs. La valeur annoncée par cette sonde sert
 uniquement à comparer les réponses de négociation du serveur.
 
-Les pushes sur `feat/oldunreal-goty-compat` compilent l'APK normal ARMv7/ARM64
-et publient une préversion GitHub `goty-compat-*`, distincte des versions du
-menu console. La signature utilise les mêmes secrets CI que les autres APK.
-L'APK conserve l'identifiant de l'application principale ; les essais locaux
-utilisent des identifiants séparés pour préserver l'installation habituelle.
+Les pushes sur `feat/oldunreal-goty-compat` compilent deux APK ARMv7/ARM64
+et publient deux releases GitHub normales, sans marqueur de préversion :
+
+- `goty-classic-<run>-<attempt>` : menu UT99 classique, variante Gradle `classic` ;
+- `goty-console-<run>-<attempt>` : menu console/téléphone, variante Gradle `normal`.
+
+Les deux APK partagent le même moteur, les mêmes correctifs et les mêmes
+données de jeu. Seul le choix du menu au lancement change. La CI exige la
+clé de signature habituelle avant publication. Les deux variantes conservent
+l'identifiant de l'application principale : installer l'une remplace l'autre
+en conservant les données et rétablit le menu correspondant, même après un
+changement de variante. Les essais locaux utilisent un identifiant séparé
+pour préserver l'installation habituelle. Le statut de release ne signifie
+pas que tous les packages système et mods 469 sont compatibles.

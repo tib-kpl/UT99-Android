@@ -45,7 +45,9 @@ jobs:
           GOTY_COMPAT: ${{ github.ref == 'refs/heads/feat/oldunreal-goty-compat' }}
         run: |
           chmod +x gradlew
-          if [ "$CONSOLE_MENU" = true ] || [ "$GOTY_COMPAT" = true ]; then
+          if [ "$GOTY_COMPAT" = true ]; then
+            ./gradlew --console=plain assembleNormalRelease assembleClassicRelease
+          elif [ "$CONSOLE_MENU" = true ]; then
             ./gradlew --console=plain assembleNormalRelease
           else
             ./gradlew --console=plain assembleNormalRelease assembleAutomotiveRelease
@@ -68,17 +70,26 @@ jobs:
             flavors="normal"
             label="-console-menu"
           elif [ "$GOTY_COMPAT" = true ]; then
-            flavors="normal"
+            flavors="normal classic"
             label="-goty-compat"
           fi
           if [ -n "$KEYSTORE" ]; then
             printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
           else
+            if [ "$GOTY_COMPAT" = true ]; then
+              echo "::error::Both GOTY releases require the configured signing key"
+              exit 1
+            fi
             echo "::warning::no ANDROID_KEYSTORE_BASE64 secret: the APKs are unsigned"
           fi
           for flavor in $flavors; do
             in="app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
             out="dist/UT99-Android-$version-fr$label-$flavor-release.apk"
+            if [ "$GOTY_COMPAT" = true ]; then
+              menu="console"
+              if [ "$flavor" = classic ]; then menu="classic"; fi
+              out="dist/UT99-Android-$version-fr-goty-$menu-menu-release.apk"
+            fi
             if [ -n "$KEYSTORE" ]; then
               "$tools/zipalign" -f -p 4 "$in" "$RUNNER_TEMP/aligned.apk"
               "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "${ALIAS:-ut99}" \
@@ -112,21 +123,26 @@ jobs:
             --title "UT99 — Menu console/PC (build $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT)" \
             --notes-file "$RUNNER_TEMP/console-menu-notes.md"
 
-      - name: Publish GOTY compatibility prerelease
+      - name: Publish classic and console GOTY releases
         if: github.ref == 'refs/heads/feat/oldunreal-goty-compat'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          tag="goty-compat-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
-          printf '%s\n\n%s\n\nCommit: %s/%s/commit/%s\nBuild: %s/%s/actions/runs/%s\n' \
-            'Experimental native Android build: console menu, collision fixes and GOTY content compatibility.' \
-            'Requires v400-compatible System packages with GOTY maps/textures/sounds/music. This is not the OldUnreal 469 engine. See docs/GOTY_COMPATIBILITY.md. Game data is not included. Unsigned APKs require signing before installation.' \
-            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" \
-            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/goty-compat-notes.md"
-          gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "UT99 GOTY compatibility (build $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT)" \
-            --notes-file "$RUNNER_TEMP/goty-compat-notes.md"
+          for menu in classic console; do
+            title="Menu classique UT99"
+            if [ "$menu" = console ]; then title="Menu console / téléphone"; fi
+            tag="goty-$menu-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+            printf '%s\n\n%s\n\n%s\n\nCommit: %s/%s/commit/%s\nBuild: %s/%s/actions/runs/%s\n' \
+              "$title — même moteur Android natif et mêmes correctifs GOTY/réseau que l’autre variante." \
+              'Conserve les packages System compatibles v400 avec les données GOTY préparées. Ce moteur ne remplace pas celui du port Android par OldUnreal 469 et ne prend pas en charge tous ses mods. Voir docs/GOTY_COMPATIBILITY.md. Données du jeu non incluses.' \
+              'APK signé ARMv7/ARM64. Les deux variantes utilisent le même identifiant : installer l’une remplace l’autre en conservant les données. Le menu correspondant est rétabli au lancement.' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/goty-$menu-notes.md"
+            gh release create "$tag" dist/*-goty-$menu-menu-release.apk --target "$GITHUB_SHA" --latest=false \
+              --title "UT99 — $title (build $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT)" \
+              --notes-file "$RUNNER_TEMP/goty-$menu-notes.md"
+          done
 
       # a successful build of the default branch becomes a GitHub release
       # (build-<run number>, marked latest, the APKs attached); the last five
