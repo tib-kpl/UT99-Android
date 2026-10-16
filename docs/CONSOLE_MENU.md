@@ -129,10 +129,20 @@ La connexion réussit alors, mais la file réseau ne se vide plus : les acteurs,
 les armes et les informations du HUD ne sont plus répliqués vers le client.
 Le moteur Android rétablit un débit de 20 000 en LAN et de 10 000 sur Internet
 si la valeur configurée est inférieure au minimum accepté de 500.
-Les valeurs configurées valides sont conservées. Le build ARM a réussi et
-le journal de l'Odin confirme le débit LAN de 20 000. Le test visuel entre
-deux consoles mises à jour reste à effectuer ; la tentative vers la Thor
-avec l'ancienne release a expiré pendant le chargement.
+Les valeurs configurées valides sont conservées.
+
+Le tri des acteurs du serveur avait aussi une écriture qui utilisait et
+incrémentait le même index dans une affectation. Avec l'évaluation du membre
+de droite avant celui de gauche, la première entrée restait indéfinie et
+le tri plantait à la connexion. L'incrément est désormais séparé.
+
+Validation sur deux consoles physiques, dans des applications de test séparées :
+Thor hôte / Odin client sur CTF-Face, puis Odin hôte / Thor client sur
+DM-Deck16][. Les deux connexions réussissent, les hôtes restent actifs et
+les clients affichent leurs armes, vie, munitions et scores. Sur Deck16,
+les autres personnages et leurs déplacements sont également visibles côté
+client. Le débit négocié dans les journaux est de 20 000. Compilation réussie
+pour ARM64 et ARMv7. Ces essais ne constituent pas un test de longue durée.
 
 Le workflow `.github/workflows/build.yml` publie les builds de `feat/console-menu`
 dans une préversion GitHub distincte, avec un tag `console-menu-<run>-<attempt>`

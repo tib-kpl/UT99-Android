@@ -829,7 +829,10 @@ INT ULevel::ServerTickClient( UNetConnection* Connection, FLOAT DeltaSeconds )
 					CullCount++;
 					Actor->NetTag                 = NetTag;
 					PriorityList  [ConsiderCount] = FActorPriority( ViewPos, ViewDir, Connection, Actor );
-					PriorityActors[ConsiderCount] = PriorityList + ConsiderCount++;
+					// Keep the index stable for both arrays. With RHS-first assignment
+					// evaluation, incrementing it here leaves entry zero uninitialized.
+					PriorityActors[ConsiderCount] = PriorityList + ConsiderCount;
+					++ConsiderCount;
 				}
 				LastTime += 0.023;
 				ThisTime += 0.023;
