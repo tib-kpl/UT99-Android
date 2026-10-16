@@ -33,7 +33,7 @@ function Created()
     bEmbedded = False;
     if(NativeHost != None) NativeHost.HideWindow();
     BrowserClient = UBrowserMainClientWindow(NativeWindow.ClientArea);
-    ListClass = class<UBrowserServerListWindow>(DynamicLoadObject(BrowserClient.ServerListWindowClass, class'Class'));
+    ListClass = class'UT99ConsoleServerListWindow';
     LANPage = BrowserClient.PageControl.AddPage(LANText, ListClass, 'UT99ConsoleLAN');
     InternetPage = BrowserClient.PageControl.AddPage(InternetText, ListClass, 'UT99ConsoleInternet');
     ServerPages[0] = UBrowserServerListWindow(LANPage.Page);
@@ -60,6 +60,11 @@ function SelectMode(int Mode)
     if(CurrentServers != None) CurrentServers.ShutdownFactories(False);
     ServerMode = Mode; SelectedServer = None; Row = 0; FirstRow = 0; ServerPage = 0; bListOptions = False;
     CurrentServers = ServerPages[Mode];
+    if(Mode < 2)
+    {
+        CurrentServers.bNoAutoSort = False;
+        ApplyServerSort();
+    }
     CurrentServers.bPingSuspend = False;
     CurrentServers.Refresh();
     RefreshClock = 0; DiscoveryClock = 0; bDiscoveryStopped = False;
@@ -213,6 +218,16 @@ function string SortModeName()
     return CurrentServers.Grid.ServerName;
 }
 
+function ApplyServerSort()
+{
+    if(SortMode == 0) CurrentServers.Grid.SortByColumn = CurrentServers.Grid.Server;
+    else if(SortMode == 1) CurrentServers.Grid.SortByColumn = CurrentServers.Grid.Ping;
+    else if(SortMode == 2) CurrentServers.Grid.SortByColumn = CurrentServers.Grid.MapName;
+    else CurrentServers.Grid.SortByColumn = CurrentServers.Grid.Players;
+    CurrentServers.Grid.bSortDescending = False;
+    if(CurrentServers.PingedList != None) CurrentServers.PingedList.Sort();
+}
+
 function OpenFavorite(bool bEdit)
 {
     local UBrowserFavoritesMenu M;
@@ -335,10 +350,7 @@ function ActivateRow()
     if(Row == Count-6)
     {
         SortMode = (SortMode+1)%4;
-        if(SortMode == 0) CurrentServers.Grid.SortColumn(CurrentServers.Grid.Server);
-        else if(SortMode == 1) CurrentServers.Grid.SortColumn(CurrentServers.Grid.Ping);
-        else if(SortMode == 2) CurrentServers.Grid.SortColumn(CurrentServers.Grid.MapName);
-        else CurrentServers.Grid.SortColumn(CurrentServers.Grid.Players);
+        ApplyServerSort();
         ServerPage = 0; Row = 0; BuildList(); return;
     }
     if(Row == Count-7 || Row == Count-8)
@@ -533,4 +545,5 @@ defaultproperties
     LANHelp="Servers on your local network. Start a multiplayer game on the host, then refresh."
     InternetHelp="Choose a server, then join. Refresh to search again."
     ServerMode=-1
+    SortMode=3
 }
