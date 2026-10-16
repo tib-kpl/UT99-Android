@@ -140,6 +140,28 @@ Les APK debug peuvent lire une URL de scénario dans
 `<dossier UT99>/physics-test-url.txt` au démarrage. Les APK release ignorent
 ce fichier et démarrent normalement sur CityIntro.
 
+## Interpolation des animations
+
+Sur Android, l'ancienne fonction `appFloor` convertissait `F-0.5` en entier
+par troncature. Par exemple, elle renvoyait 0 pour 1,4. Le rendu de maillage
+sélectionnait alors la mauvaise paire de poses et utilisait parfois un
+coefficient d'interpolation supérieur à 1, avant de revenir brusquement à la
+paire suivante. La boucle de repos du Nettoyeur/Enforcer rend ce défaut visible.
+
+La branche Android utilise maintenant `floorf`. Le test natif
+`tools/native_tests/animation_interpolation.cpp` inclut directement l'en-tête
+de production. Il vérifie les arrondis négatifs/positifs et une piste de poses
+périodique sur deux boucles. Avant correction, 3501 échantillons extrapolaient
+et le saut maximal atteignait 0,999 ; après correction, aucun n'extrapole et le
+pas maximal vaut environ 0,001, conforme à l'échantillonnage. Le test passe sur
+l'Odin en ARM64 et ARMv7. Les 192 traversées d'Oblivion et les trois contrôles
+mur/plafond/sol ont également été rejoués avec succès après ce changement.
+L'observation manuelle de la boucle du Nettoyeur sur l'Odin confirme un
+mouvement fluide après correction.
+
+Le mutateur de test `UT99PhysicsAudit.AnimationObserve` permet d'observer
+l'animation normale en solo sans bots. Il n'est pas intégré à l'APK.
+
 ## APK expérimental
 
 ### Essais réseau

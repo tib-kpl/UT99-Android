@@ -27,6 +27,9 @@
 #include <ctype.h>
 #include <malloc.h>
 #include <dirent.h>
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+#include <math.h>
+#endif
 #ifdef PLATFORM_WIN32
 #include <minwindef.h>
 #endif
@@ -213,8 +216,14 @@ inline INT appRound( FLOAT F )
 #define DEFINED_appFloor 1
 inline INT appFloor( FLOAT F )
 {
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	// Casting F-0.5 truncates toward zero under Clang; it is not floor.
+	// Mesh interpolation then extrapolates (Alpha>=1) and jumps at half frames.
+	return (INT)floorf(F);
+#else
 	static FLOAT Half=0.5;
 	return (INT)(F - Half);
+#endif
 }
 
 //
