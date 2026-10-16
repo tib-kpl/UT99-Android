@@ -71,6 +71,7 @@ function bool HandleCapturedControllerKey(int Key)
 {
     if(DialogScreen == None || !DialogScreen.bWindowVisible || DialogScreen.BindingOwner == None || !DialogScreen.BindingOwner.bPolling) return False;
     DialogScreen.BindingOwner.KeyDown(Key, 0, 0);
+    DialogScreen.RefreshExtraBindings();
     DialogScreen.BindingOwner = None;
     DialogScreen.FocusWindow(); DialogScreen.BuildList();
     return True;

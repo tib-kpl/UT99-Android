@@ -1,6 +1,6 @@
 project(Engine CXX)
 
-file(GLOB SRC_FILES "Src/*.cpp")
+file(GLOB SRC_FILES CONFIGURE_DEPENDS "Src/*.cpp")
 
 if(LOW_MEMORY)
   list(FILTER SRC_FILES EXCLUDE REGEX "UnPath")

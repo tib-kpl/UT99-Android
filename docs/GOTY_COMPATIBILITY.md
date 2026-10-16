@@ -71,8 +71,17 @@ relique de régénération aux deux clients d'un serveur 469. Les clients ARM64
 et ARMv7 reçoivent la relique, affichent son icône et atteignent la santé 150
 confirmée par le serveur.
 
-`RelicsBindings` reste exclu : la classe `UTMenu.UTExtraKeyBindings` et sa
-prise en charge par l'interface doivent encore être ajoutées. `SkeletalChars`
+`RelicsBindings` est ?galement inclus. Une classe native de m?tadonn?es
+`UTMenu.UTExtraKeyBindings` permet de charger son package original sans
+modifier `UTMenu.u`. Le menu Commandes ajoute les actions d?clar?es par les
+mods et conserve leurs commandes compl?tes, notamment `mutate tossrelic`,
+lors de l?affectation et de la relecture des touches. Le lecteur de
+configuration ignore la marque UTF-8 initiale des fichiers r?cents pour
+reconna?tre leur premi?re section `[public]`. Le sc?nario isol?
+`tools/menu_audit/Classes/ExtraBindingsAudit.uc` v?rifie ces ?tapes et la
+r?ouverture sans doublon sur ARM64 et ARMv7, puis restaure la touche de test.
+
+`SkeletalChars`
 demande les objets audio déplacés dans Botpack, mais aussi les types natifs
 `SkeletalMesh` et `Animation`, absents du moteur actuel. Leur prise en charge
 ne se résume donc pas à un remplacement de référence audio. Le garde-fou sur

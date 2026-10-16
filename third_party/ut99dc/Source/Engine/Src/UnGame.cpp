@@ -7,6 +7,7 @@
 =============================================================================*/
 
 #include "EnginePrivate.h"
+#include "UnExtraKeyBindings.h"
 #include "UnRender.h"
 #include "UnNet.h"
 #include "UT99LoadProfiler.h"
@@ -843,6 +844,7 @@ UBOOL UGameEngine::Exec( const TCHAR* Cmd, FOutputDevice& Ar )
 	guard(UGameEngine::Exec);
 	const TCHAR* Str=Cmd;
 #if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	if( AndroidExtraBindingsExec(Cmd,Ar,this) ) return 1;
 	if( ParseCommand(&Str,TEXT("ANDROID_CLIENT_NET_VERSION")) )
 	{
 		Ar.Logf(TEXT("%i"),ENGINE_CLIENT_NETWORK_VERSION);

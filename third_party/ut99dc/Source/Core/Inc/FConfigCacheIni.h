@@ -31,6 +31,12 @@ public:
 		if( appLoadFileToString( Text, Filename ) )
 		{
 			TCHAR* Ptr = const_cast<TCHAR*>( *Text );
+#if defined(PLATFORM_ANDROID)
+            // Modern registration/localization files may carry a UTF-8 BOM.
+            // Keep the original text bytes, but do not hide the first section.
+            if( Text.Len()>=3 && (BYTE)Ptr[0]==0xef && (BYTE)Ptr[1]==0xbb && (BYTE)Ptr[2]==0xbf )
+                Ptr+=3;
+#endif
 			FConfigSection* CurrentSection = NULL;
 			UBOOL Done = 0;
 			while( !Done )

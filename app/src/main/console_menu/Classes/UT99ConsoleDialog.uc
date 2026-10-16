@@ -19,6 +19,68 @@ var byte HistoryEntries[512];
 var localized string HistoryText;
 var localized string BindingHint, WeaponsText, ReorderHint, PreviewFaceText;
 var localized string ServerAddressText, JoinServerText, RecentServersText, AddressHelp, AddressLocation;
+var UMenuCustomizeClientWindow ExtraKeys;
+var int FirstExtraKey;
+
+function AddExtraBindings()
+{
+    local int ClassIndex, BindingIndex, Split, Slot, Added, Result;
+    local string ClassName, Data, Section, Label, Alias;
+    local UMenuLabelControl KeyLabel;
+    local UMenuRaisedButton KeyButton;
+    ExtraKeys=UMenuCustomizeClientWindow(NativeWindow.FindChildWindow(class'UMenuCustomizeClientWindow'));
+    if(ExtraKeys == None) return;
+    FirstExtraKey=ExtraKeys.AliasCount;
+    for(ClassIndex=0; ClassIndex<128; ClassIndex++)
+    {
+        ClassName=GetPlayerOwner().GetNextInt("UTMenu.UTExtraKeyBindings",ClassIndex);
+        if(ClassName == "") break;
+        for(BindingIndex=0; BindingIndex<30; BindingIndex++)
+        {
+            Data=GetPlayerOwner().ConsoleCommand("ANDROID_EXTRA_BINDING "$ClassName$" "$BindingIndex);
+            Split=InStr(Data,Chr(9));
+            if(Split<0) break;
+            Section=Left(Data,Split); Data=Mid(Data,Split+1);
+            Split=InStr(Data,Chr(9));
+            if(Split<0) break;
+            Label=Left(Data,Split); Alias=Mid(Data,Split+1);
+            if(Label == "" || Alias == "") continue;
+            Slot=ExtraKeys.AliasCount;
+            if(Slot>=70) break;
+            KeyLabel=UMenuLabelControl(ExtraKeys.CreateControl(class'UMenuLabelControl',20,ExtraKeys.NoJoyDesiredHeight+3,200,1));
+            KeyButton=UMenuRaisedButton(ExtraKeys.CreateControl(class'UMenuRaisedButton',220,ExtraKeys.NoJoyDesiredHeight,100,1));
+            Result=int(GetPlayerOwner().ConsoleCommand("ANDROID_MOD_KEY_ADD "$string(ExtraKeys)$" "$string(KeyLabel)$" "$string(KeyButton)$" "$ClassName$" "$BindingIndex));
+            if(Result<=0)
+            {
+                KeyLabel.Close(); KeyButton.Close();
+                if(Result<0) FirstExtraKey=Min(FirstExtraKey,-Result-1);
+                continue;
+            }
+            KeyLabel.SetText(Section$" / "$Label);
+            KeyLabel.SetFont(F_Normal);
+            KeyButton.bAcceptsFocus=False;
+            KeyButton.SetHelpText(ExtraKeys.CustomizeHelp);
+            ExtraKeys.NoJoyDesiredHeight+=19;
+            ExtraKeys.JoyDesiredHeight+=19;
+            Added++;
+        }
+    }
+    if(Added>0)
+    {
+        if(ExtraKeys.JoystickHeading != None) ExtraKeys.JoystickHeading.WinTop+=Added*19;
+        if(ExtraKeys.JoyXCombo != None) ExtraKeys.JoyXCombo.WinTop+=Added*19;
+        if(ExtraKeys.JoyYCombo != None) ExtraKeys.JoyYCombo.WinTop+=Added*19;
+    }
+    RefreshExtraBindings();
+}
+
+function RefreshExtraBindings()
+{
+    if(ExtraKeys == None) return;
+    // v400 bytecode cannot address an int[70] through an external context.
+    // Native reflection also preserves complete commands such as mutate tossrelic.
+    GetPlayerOwner().ConsoleCommand("ANDROID_MOD_KEYS_SYNC "$string(ExtraKeys)$" "$FirstExtraKey);
+}
 
 function UWindowPageControl FindTabs(UWindowWindow W)
 {
@@ -60,6 +122,7 @@ function Created()
     if(Weapons != None) Log("UT99Console weapon list:"@Weapons.Class@"items="@Weapons.Items.Count()@"visible="@Weapons.Items.CountShown());
     if(Weapons != None && Weapons.Items.CountShown() == 0) FillMissingWeapons();
     if(Weapons != None) HintText = ReorderHint;
+    AddExtraBindings();
     SetAcceptsHotKeys(True);
     MenuFont = Font(DynamicLoadObject("UWindowFonts.UTFont40", class'Font'));
     BuildList();
@@ -155,6 +218,7 @@ function BuildList()
     local int i;
     local UWindowList Item;
     local UWindowPageControlPage Tab;
+    if(ExtraKeys == None) AddExtraBindings();
     if(bEmbedded || bDetailMode) { Count = 1; return; }
     for(i = 0; i < 512; i++) { Entries[i] = None; Controls[i] = None; HistoryEntries[i] = 0; }
     Count = 0;
@@ -350,6 +414,7 @@ function ActivateRow()
         BindingOwner = UMenuCustomizeClientWindow(Button.NotifyWindow);
         if(BindingOwner != None && BindingOwner.bPolling) return;
         BindingOwner = None;
+        RefreshExtraBindings();
         if(UWindowMessageBoxCW(NativeWindow.ClientArea) != None || FreeSlotsClient(NativeWindow.ClientArea) != None ||
            UWindowSmallOKButton(Button) != None || UWindowSmallCancelButton(Button) != None)
             Finish();
@@ -422,6 +487,7 @@ function bool HotKeyDown(int Key, float X, float Y)
             BindingOwner.bPolling = False; BindingOwner.SelectedButton.bDisabled = False;
         }
         else BindingOwner.KeyDown(Key, 0, 0);
+        RefreshExtraBindings();
         BindingOwner = None; FocusWindow(); BuildList(); return True;
     }
     if(bEmbedded)
