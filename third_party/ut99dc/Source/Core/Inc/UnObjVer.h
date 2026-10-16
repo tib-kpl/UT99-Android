@@ -13,6 +13,14 @@
 // Engine build number, for displaying to end users.
 #define ENGINE_VERSION 400
 
+// Android clients can negotiate the classic 432 wire protocol. This is
+// independent of native package layouts, file version and listen-server build.
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+#define ENGINE_CLIENT_NETWORK_VERSION 432
+#else
+#define ENGINE_CLIENT_NETWORK_VERSION ENGINE_VERSION
+#endif
+
 // Base protocol version to negotiate in network play.
 #define ENGINE_NEGOTIATION_VERSION 400
 

@@ -44,7 +44,11 @@ UNetPendingLevel::UNetPendingLevel( UEngine* InEngine, const FURL& InURL )
 	if( NetDriver->InitConnect( this, URL, Error ) )
 	{
 		// Send initial message.
-		NetDriver->ServerConnection->Logf( TEXT("HELLO REVISION=0 MINVER=%i VER=%i"), ENGINE_MIN_NET_VERSION, ENGINE_VERSION );
+		INT AdvertisedVersion = ENGINE_CLIENT_NETWORK_VERSION;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+		debugf(NAME_Log, TEXT("AndroidNet: connecting with advertised version %i"), AdvertisedVersion);
+#endif
+		NetDriver->ServerConnection->Logf( TEXT("HELLO REVISION=0 MINVER=%i VER=%i"), ENGINE_MIN_NET_VERSION, AdvertisedVersion );
 		NetDriver->ServerConnection->FlushNet();
 	}
 	else
@@ -94,6 +98,11 @@ void UNetPendingLevel::NotifyReceivedText( UNetConnection* Connection, const TCH
 		INT RemoteMinVer=0, RemoteVer=0;
 		Parse( Text, TEXT("MINVER="), RemoteMinVer );
 		Parse( Text, TEXT("VER="),    RemoteVer    );
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+		Error = FString::Printf(TEXT("Incompatible network version: server %i, minimum %i."), RemoteVer, RemoteMinVer);
+		Connection->State = USOCK_Closed;
+		return;
+#endif
 		if( ENGINE_VERSION < RemoteMinVer )
 		{
 			// Upgrade message.
@@ -108,6 +117,10 @@ void UNetPendingLevel::NotifyReceivedText( UNetConnection* Connection, const TCH
 	else if( ParseCommand(&Text,TEXT("FAILURE")) )
 	{
 		// Report problem to user.
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+		Error = Text;
+		Connection->State = USOCK_Closed;
+#endif
 		Engine->SetProgress( TEXT("Rejected By Server"), Text, 10.0 );
 	}
 	else if( ParseCommand(&Text,TEXT("FAILCODE")) )
@@ -147,6 +160,14 @@ void UNetPendingLevel::NotifyReceivedText( UNetConnection* Connection, const TCH
 		// Challenged by server.
 		INT RemoteStats = 0, i=0;
 		Parse( Text, TEXT("VER="), Connection->NegotiatedVer );
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+		if( Connection->NegotiatedVer < ENGINE_MIN_NET_VERSION || Connection->NegotiatedVer > ENGINE_CLIENT_NETWORK_VERSION )
+		{
+			Error = FString::Printf(TEXT("Unsupported negotiated network version %i."), Connection->NegotiatedVer);
+			Connection->State = USOCK_Closed;
+			return;
+		}
+#endif
 		Parse( Text, TEXT("CHALLENGE="), Connection->Challenge );
 
 		Parse( Text, TEXT("STATS="), RemoteStats );

@@ -613,6 +613,7 @@ final class UT99Paths {
         }
         ensureAndroidLanguageConfig(system, resolveGameLanguage(system, preferredLanguage));
         ensureAndroidLeanMenuConfig(system);
+        ensureAndroidNetworkDownloads(system);
         ensureAndroidControllerBindingConfig(system); // UT99_ANDROID_CONTROLLER_BINDING_FIX_V117
         ensureAndroidControllerFriendlyKeyNames(system); // UT99_ANDROID_CONTROLLER_KEY_NAMES_V118
         return created;
@@ -1040,6 +1041,18 @@ final class UT99Paths {
         }
     }
 
+    private static void ensureAndroidNetworkDownloads(File systemDir) throws IOException {
+        File ini = new File(systemDir, "AndroidUT99.ini");
+        String text = readBytePreservingText(ini);
+        String marker = "; UT99_ANDROID_NETWORK_DOWNLOADS_V1";
+        if (!text.contains(marker)) {
+            // Earlier generated configurations disabled every server download.
+            // Migrate once; subsequent user changes remain intact.
+            writeBytePreservingText(ini, text + "\n" + marker
+                    + "\n[IpDrv.TcpNetDriver]\nAllowDownloads=True\n");
+        }
+    }
+
     private static void ensureAndroidLeanMenuConfig(File systemDir) throws IOException {
         if (systemDir == null) return;
 
@@ -1235,7 +1248,7 @@ final class UT99Paths {
                 "AmbientFactor=0.700000\n" +
                 "\n" +
                 "[IpDrv.TcpNetDriver]\n" +
-                "AllowDownloads=False\n" +
+                "AllowDownloads=True\n" +
                 "ConnectionTimeout=15.0\n" +
                 "InitialConnectTimeout=30.0\n" +
                 "AckTimeout=1.0\n" +

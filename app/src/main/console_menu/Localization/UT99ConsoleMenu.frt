@@ -1,3 +1,6 @@
+[UT99ConsoleRoot]
+NetworkErrorTitle=CONNEXION IMPOSSIBLE
+
 [UT99ConsoleHome]
 LANMenuText=PARTIES LAN
 InternetMenuText=PARTIES EN LIGNE

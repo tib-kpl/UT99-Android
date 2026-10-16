@@ -12,6 +12,20 @@
 #include "UT99LoadProfiler.h"
 
 #if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+static FString AndroidLastNetworkError;
+static void AndroidReportNetworkError(UGameEngine* Engine, const FString& Detail)
+{
+	AndroidLastNetworkError=Detail;
+	if( Engine->Client && Engine->Client->Viewports.Num() && Engine->Client->Viewports(0)->Console )
+	{
+		UConsole* Console=Engine->Client->Viewports(0)->Console;
+		UFunction* ShowMenu=Console->FindFunction(FName(TEXT("LaunchUWindow"),FNAME_Find));
+		if( ShowMenu ) Console->ProcessEvent(ShowMenu,NULL);
+	}
+}
+#endif
+
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
 #include <android/log.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -828,6 +842,19 @@ UBOOL UGameEngine::Exec( const TCHAR* Cmd, FOutputDevice& Ar )
 {
 	guard(UGameEngine::Exec);
 	const TCHAR* Str=Cmd;
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	if( ParseCommand(&Str,TEXT("ANDROID_CLIENT_NET_VERSION")) )
+	{
+		Ar.Logf(TEXT("%i"),ENGINE_CLIENT_NETWORK_VERSION);
+		return 1;
+	}
+	if( ParseCommand(&Str,TEXT("ANDROID_TAKE_NET_ERROR")) )
+	{
+		Ar.Log(*AndroidLastNetworkError);
+		AndroidLastNetworkError=TEXT("");
+		return 1;
+	}
+#endif
 	if( ParseCommand( &Str, TEXT("OPEN") ) )
 	{
 		FString Error;
@@ -1150,12 +1177,18 @@ UBOOL UGameEngine::Browse( FURL URL, const TMap<FString,FString>* TravelInfo, FS
 	{
 		// Network URL.
 		guard(NetworkURL);
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+		AndroidLastNetworkError=TEXT("");
+#endif
 		if( GPendingLevel )
 			CancelPending();
 		GPendingLevel = new UNetPendingLevel( this, URL );
 		if( !GPendingLevel->NetDriver )
 		{
 			SetProgress( TEXT("Networking Failed"), *GPendingLevel->Error, 6.0 );
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+			AndroidReportNetworkError(this,GPendingLevel->Error);
+#endif
 			delete GPendingLevel;
 			GPendingLevel = NULL;
 		}
@@ -2197,6 +2230,9 @@ void UGameEngine::Tick( FLOAT DeltaSeconds )
 		{
 			// Pending connect failed.
 			guard(PendingFailed);
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+			AndroidReportNetworkError(this,GPendingLevel->Error);
+#endif
 			SetProgress( LocalizeError("ConnectionFailed"), *GPendingLevel->Error, 4.0 );
 			debugf( NAME_Log, LocalizeError("Pending"), *GPendingLevel->URL.String(), *GPendingLevel->Error );
 			delete GPendingLevel;
@@ -2211,6 +2247,9 @@ void UGameEngine::Tick( FLOAT DeltaSeconds )
 			LoadMap( GPendingLevel->URL, GPendingLevel, NULL, Error );
 			if( Error!=TEXT("") )
 			{
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+				AndroidReportNetworkError(this,Error);
+#endif
 				SetProgress( LocalizeError("ConnectionFailed"), *Error, 4.0 );
 			}
 			else if( !GPendingLevel->LonePlayer )

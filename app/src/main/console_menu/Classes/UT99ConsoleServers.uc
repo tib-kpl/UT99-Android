@@ -154,7 +154,7 @@ function string Caption(int Index)
         }
         if(Index == 0)
         {
-            if(SelectedServer.MinNetVer > int(GetLevel().EngineVersion)) return IncompatibleText$" "$SelectedServer.MinNetVer;
+            if(SelectedServer.MinNetVer > UT99ConsoleRoot(Root).ClientNetworkVersion) return IncompatibleText$" "$SelectedServer.MinNetVer;
             return JoinText;
         }
         if(Index == 1) { if(ServerMode == 2) return RemoveFavoriteText; return FavoriteText; }
@@ -268,7 +268,7 @@ function ActivateRow()
         if(bServerDetails) return;
         if(Row == 0)
         {
-            if(SelectedServer.MinNetVer > int(GetLevel().EngineVersion)) return;
+            if(SelectedServer.MinNetVer > UT99ConsoleRoot(Root).ClientNetworkVersion) return;
             if(SelectedServer.GamePort == 0) SelectedServer.GamePort = Max(1, SelectedServer.QueryPort-1);
             NativeWindow.SetParent(NativeParent);
             CurrentServers.Grid.JoinServer(SelectedServer);

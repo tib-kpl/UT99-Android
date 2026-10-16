@@ -29,10 +29,12 @@ ne sont pas substitués : ils nécessitent encore un portage distinct.
 Les Relics, MultiMesh, modèles squelettiques et les fonctionnalités propres
 au moteur 469 ne sont donc pas annoncés comme pris en charge.
 
-Le protocole réseau reste v400. Les serveurs OldUnreal 469 exigent au minimum
-432 : cette branche ne permet donc pas encore de les rejoindre. Porter les
-échanges réseau et les packages requis est un chantier distinct ; modifier
-simplement le numéro annoncé ne suffirait pas à établir la compatibilité.
+Les clients Android négocient désormais jusqu'au protocole classique 432,
+indépendamment de la version 400 du moteur et de ses packages système. Un
+serveur v400 peut toujours négocier 400. Le navigateur LAN/Internet utilise
+cette capacité réseau pour décider si le bouton de connexion est disponible.
+Cela ne signifie pas que tous les mods et protections de serveurs 469 sont
+compatibles avec le port Android.
 
 L'audit ci-dessous charge chaque carte et exporte son niveau avec le moteur
 v400 dans une copie isolée. Cela vérifie les références et le chargement,
@@ -139,6 +141,40 @@ Les APK debug peuvent lire une URL de scénario dans
 ce fichier et démarrent normalement sur CityIntro.
 
 ## APK expérimental
+
+### Essais réseau
+
+Un serveur OldUnreal 469 local isolé a été rejoint par deux clients Android
+(Odin et Thor), avec les packages système v400. Le test contrôle le HUD,
+l'arme et l'inventaire, la visibilité de l'autre joueur, les déplacements et
+les dégâts confirmés par le serveur. Un package de test absent est téléchargé
+par le canal fichier, placé en cache puis chargé avant l'entrée en partie.
+Les tirs ont réduit la santé des deux joueurs de 100 à 50. Une connexion au
+serveur Windows v400 de référence a aussi abouti, avec négociation 400 et
+affichage du HUD et de l'arme après le début du match.
+Cela valide ce scénario classique, sans certifier les mods qui utilisent de
+nouvelles fonctions natives ou les protections propres aux clients PC.
+
+Les anciennes configurations générées désactivaient tous les téléchargements.
+Une migration unique rétablit `AllowDownloads=True` dans `AndroidUT99.ini`.
+Les modifications de ce réglage faites après la migration sont conservées.
+Les refus de téléchargement, rejets et erreurs de connexion restent affichés
+dans le menu jusqu'à validation, au lieu d'un message blanc fugitif.
+
+Le mutateur `UT99PhysicsAudit.NetworkPlayAudit` est un scénario de test à deux
+clients pour DM-Oblivion. Il les place face à face une fois armés et journalise
+leur état côté serveur. Il ne doit pas être activé dans une partie normale.
+Il n'est pas inclus dans l'APK.
+
+La sonde ci-dessous peut inspecter le canal de contrôle d'un serveur de test :
+
+```powershell
+python tools/probe_ut99_network.py 127.0.0.1 --port 7777 --version 432
+```
+
+Elle ne rejoint pas la partie, ne télécharge aucun fichier et ne démontre pas
+la compatibilité des acteurs. La valeur annoncée par cette sonde sert
+uniquement à comparer les réponses de négociation du serveur.
 
 Les pushes sur `feat/oldunreal-goty-compat` compilent l'APK normal ARMv7/ARM64
 et publient une préversion GitHub `goty-compat-*`, distincte des versions du

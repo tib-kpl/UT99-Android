@@ -14,6 +14,8 @@ var bool bOpenHomeAfterTravel;
 var UT99ConsoleDialog DialogScreen;
 var float NavigationClock, NextBackTime;
 var bool bIgnoreSyntheticHover;
+var localized string NetworkErrorTitle;
+var int ClientNetworkVersion;
 
 function SetSyntheticHover(bool bIgnore)
 {
@@ -160,6 +162,8 @@ function Created()
 {
     local UMenuMultiplayerMenu M;
     Super.Created();
+    ClientNetworkVersion = int(GetPlayerOwner().ConsoleCommand("ANDROID_CLIENT_NET_VERSION"));
+    if(ClientNetworkVersion == 0) ClientNetworkVersion = int(GetEntryLevel().EngineVersion);
     ChooseMapBackdrop();
     MenuBar.bShowMenu = False;
     MenuBar.CloseUp();
@@ -208,6 +212,8 @@ function Tick(float Delta)
     local UMenuBotmatchWindow MatchWindow;
     local UWindowFramedWindow ListWindow;
     local UWindowWindow CampaignWindow, W;
+    local string NetworkError;
+    local UWindowMessageBox NetworkDialog;
     Super.Tick(Delta);
     NavigationClock += Delta;
     if(IsGameplayMenu())
@@ -222,6 +228,14 @@ function Tick(float Delta)
     else bLoggedGameplayMenu = False;
     if(Home == None)
         return;
+    NetworkError = GetPlayerOwner().ConsoleCommand("ANDROID_TAKE_NET_ERROR");
+    if(NetworkError != "")
+    {
+        Console.LaunchUWindow();
+        // A root window has no framed parent for UWindowWindow.MessageBox.
+        NetworkDialog = UWindowMessageBox(CreateWindow(class'UWindowMessageBox', 0, 0, 320, 180, Self));
+        NetworkDialog.SetupMessageBox(NetworkErrorTitle, NetworkError, MB_OK, MR_OK, MR_OK);
+    }
     Home.bActionThisTick = False;
     Home.UIClock += Delta;
     if(MatchScreen != None)
@@ -362,6 +376,7 @@ function CloseActiveWindow()
 
 defaultproperties
 {
+    NetworkErrorTitle="CONNECTION FAILED"
     LookAndFeelClass="UMenu.UMenuGoldLookAndFeel"
     Backdrop(0)=Texture'UMenu.Icons.Bg11'
     Backdrop(1)=Texture'UMenu.Icons.Bg21'
