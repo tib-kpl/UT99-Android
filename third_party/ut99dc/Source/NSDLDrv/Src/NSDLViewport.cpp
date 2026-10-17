@@ -40,7 +40,8 @@ extern "C" int UT99AndroidRedirectPoll(int Progress)
     if(!Env) return -1;
     jclass C=Env->FindClass("com/ast/ut99/Ut99RedirectDownload");
     if(!C) { Env->ExceptionClear(); return -1; }
-    jmethodID M=Env->GetStaticMethodID(C,Progress ? "progress" : "status","()I");
+    const char* Method=Progress==2 ? "total" : Progress==1 ? "progress" : "status";
+    jmethodID M=Env->GetStaticMethodID(C,Method,"()I");
     int Result=M ? Env->CallStaticIntMethod(C,M) : -1;
     if(Env->ExceptionCheck()) { Env->ExceptionClear(); Result=-1; }
     Env->DeleteLocalRef(C);

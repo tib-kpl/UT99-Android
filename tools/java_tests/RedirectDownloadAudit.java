@@ -6,6 +6,8 @@ import java.net.InetSocketAddress;
 import java.nio.file.*;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Run with a local package and its UCC-compressed .uz; no game data is shipped. */
 public final class RedirectDownloadAudit {
@@ -56,6 +58,23 @@ public final class RedirectDownloadAudit {
             exchange.sendResponseHeaders(302, -1); exchange.close();
         });
         server.createContext("/missing", exchange -> { exchange.sendResponseHeaders(404, -1); exchange.close(); });
+        CountDownLatch[] gates = {new CountDownLatch(1), new CountDownLatch(1), new CountDownLatch(1)};
+        String[] slowRoutes = {"/slow-raw", "/slow-uz", "/slow-chunked-uz"};
+        for (int index = 0; index < slowRoutes.length; index++) {
+            final int test = index;
+            server.createContext(slowRoutes[index], exchange -> {
+                byte[] payload = test == 0 ? expected : compressed;
+                exchange.sendResponseHeaders(200, test == 2 ? 0 : payload.length);
+                try {
+                    int half = payload.length / 2;
+                    exchange.getResponseBody().write(payload, 0, half);
+                    exchange.getResponseBody().flush();
+                    gates[test].await(5, TimeUnit.SECONDS);
+                    exchange.getResponseBody().write(payload, half, payload.length - half);
+                } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                finally { exchange.close(); }
+            });
+        }
         server.start();
         Path output = Files.createTempFile("ut99-redirect-audit-", ".tmp");
         try {
@@ -64,8 +83,29 @@ public final class RedirectDownloadAudit {
                 check(Ut99RedirectDownload.start(root + route, output.toString(), expected.length, !route.equals("/raw")), "Start failed");
                 check(await() == 1, "HTTP transfer failed: " + route);
                 check(Arrays.equals(expected, Files.readAllBytes(output)), "HTTP bytes differ");
+                check(Ut99RedirectDownload.total() == (route.equals("/raw") ? expected.length : compressed.length), "Wrong payload total: " + route);
                 Ut99RedirectDownload.cancel();
                 check(!Files.exists(output), "Cancel left temporary file");
+            }
+            for (int index = 0; index < slowRoutes.length; index++) {
+                check(Ut99RedirectDownload.start(root + slowRoutes[index], output.toString(), expected.length, index != 0), "Slow start failed");
+                try {
+                    long deadline = System.nanoTime() + 3_000_000_000L;
+                    while (Ut99RedirectDownload.progress() == 0 && System.nanoTime() < deadline) Thread.sleep(10);
+                    int received = Ut99RedirectDownload.progress();
+                    int total = Ut99RedirectDownload.total();
+                    check(received > 0 && Ut99RedirectDownload.status() == 0, "Missing in-flight progress");
+                    if (index == 2) check(total == -1, "Chunked compressed total must be unknown while transferring");
+                    else {
+                        check(total == (index == 0 ? expected.length : compressed.length), "Wrong in-flight total");
+                        long percent = 100L * received / total;
+                        check(percent > 0 && percent < 100, "Invalid in-flight percentage: " + percent);
+                    }
+                } finally { gates[index].countDown(); }
+                check(await() == 1, "Slow transfer failed");
+                check(Arrays.equals(expected, Files.readAllBytes(output)), "Slow transfer bytes differ");
+                check(Ut99RedirectDownload.total() == Ut99RedirectDownload.progress(), "Final payload total differs");
+                Ut99RedirectDownload.cancel();
             }
             Ut99RedirectDownload.start(root + "/missing", output.toString(), expected.length, true);
             check(await() == -1, "404 was not rejected");
@@ -75,8 +115,9 @@ public final class RedirectDownloadAudit {
             Ut99RedirectDownload.cancel();
             Thread.sleep(100);
             check(!Files.exists(output), "Cancelled transfer wrote output");
-            System.out.println("PASS: exact UZ/HTTP bytes, redirects, truncation, 1000 malformed streams, 404, size, cancellation");
+            System.out.println("PASS: exact UZ/HTTP bytes, redirects, truncation, 1000 malformed streams, 404, size, cancellation, live HTTP/UZ percentage and unknown-length progress");
         } finally {
+            for (CountDownLatch gate : gates) gate.countDown();
             Ut99RedirectDownload.cancel();
             Files.deleteIfExists(output);
             server.stop(0);

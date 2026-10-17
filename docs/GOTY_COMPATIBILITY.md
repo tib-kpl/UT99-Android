@@ -122,6 +122,11 @@ avant son placement en cache. Une erreur HTTP, une réponse invalide ou une
 mauvaise version provoque un repli vers le canal fichier classique. Les
 installations locales et leurs packages ne sont jamais écrasés.
 
+Le téléchargement HTTP affiche le pourcentage et les Mo reçus/attendus lorsque
+la taille de la réponse est connue. Pour `.uz`, il utilise la taille compressée
+HTTP, pas celle du package décompressé. Si une réponse compressée n'annonce pas
+sa taille, les Mo reçus restent affichés jusqu'à la fin du transfert.
+
 Une copie de carte de test de 952119 octets, absente des deux consoles, a été
 téléchargée par le miroir HTTP local sur Wi-Fi, puis chargée sur Thor et Odin
 avec connexion au serveur 469. Les fichiers reçus correspondent au SHA-256

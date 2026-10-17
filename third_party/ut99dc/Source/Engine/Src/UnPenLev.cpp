@@ -417,7 +417,12 @@ void UNetPendingLevel::TickRedirect(FLOAT DeltaTime)
 		{
 			RedirectClock=0;
 			FPackageInfo& Info=NetDriver->ServerConnection->PackageMap->List(RedirectPackage);
-			FString Progress=FString::Printf(TEXT("%s - HTTP: %.2f MB"),Info.Parent->GetName(),Max(0,UT99AndroidRedirectPoll(1))/1048576.0);
+			// Compressed redirects transfer .uz bytes, not the expanded package size.
+			INT Received=Max(0,UT99AndroidRedirectPoll(1));
+			INT Total=UT99AndroidRedirectPoll(2);
+			FString Progress=Total>0
+				? FString::Printf(TEXT("%s - HTTP: %.0f%% (%.2f / %.2f MB)"),Info.Parent->GetName(),Clamp(100.0*Received/Total,0.0,100.0),Received/1048576.0,Total/1048576.0)
+				: FString::Printf(TEXT("%s - HTTP: %.2f MB"),Info.Parent->GetName(),Received/1048576.0);
 			NotifyProgress(TEXT("Downloading"),*Progress,1.0);
 		}
 		return;

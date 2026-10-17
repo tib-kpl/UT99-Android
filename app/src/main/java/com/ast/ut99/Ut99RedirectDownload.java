@@ -12,16 +12,16 @@ public final class Ut99RedirectDownload {
 
     private static final class Job {
         volatile boolean cancelled;
-        volatile int state, bytes;
+        volatile int state, bytes, totalBytes;
         volatile HttpURLConnection connection;
         final File output;
-        Job(String path) { output = new File(path); }
+        Job(String path, int total) { output = new File(path); totalBytes = total; }
     }
 
     public static synchronized boolean start(String address, String path, int size, boolean compressed) {
         cancel();
         if (size <= 0 || size > LIMIT) return false;
-        Job job = new Job(path);
+        Job job = new Job(path, compressed ? -1 : size);
         current = job;
         Thread worker = new Thread(() -> {
             try {
@@ -48,6 +48,8 @@ public final class Ut99RedirectDownload {
 
     public static int status() { Job job = current; return job == null ? -1 : job.state; }
     public static int progress() { Job job = current; return job == null ? 0 : job.bytes; }
+    /** HTTP payload size, which can differ from the expanded package size for .uz. */
+    public static int total() { Job job = current; return job == null ? -1 : job.totalBytes; }
     public static synchronized void cancel() {
         Job job = current;
         current = null;
@@ -82,6 +84,7 @@ public final class Ut99RedirectDownload {
                 if (code != 200) throw new IOException("HTTP " + code);
                 long length = connection.getContentLength();
                 if (length > LIMIT) throw new IOException("Download too large");
+                if (length >= 0) job.totalBytes = (int)length;
                 try (InputStream in = connection.getInputStream();
                      ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                     byte[] block = new byte[32768];
@@ -93,6 +96,7 @@ public final class Ut99RedirectDownload {
                         job.bytes = out.size();
                     }
                     if (length >= 0 && out.size() != length) throw new IOException("Truncated download");
+                    job.totalBytes = out.size();
                     return out.toByteArray();
                 }
             } finally { connection.disconnect(); }
