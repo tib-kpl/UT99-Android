@@ -35,6 +35,7 @@ public final class Ut99RedirectDownload {
                 System.err.println("UT99 redirect failed: " + failure);
                 job.state = -1;
             } catch (OutOfMemoryError exhausted) {
+                System.err.println("UT99 redirect failed: insufficient memory for package of " + size + " bytes");
                 job.state = -1;
             } finally {
                 if (job.connection != null) job.connection.disconnect();
@@ -135,8 +136,21 @@ public final class Ut99RedirectDownload {
             alphabet[0] = value;
             buffer[i] = (byte)value;
         }
+        // Determine the exact output size first. Growing streams and their final
+        // copies can otherwise exhaust Android's heap for a 40 MB package.
         input = new Cursor(buffer);
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int outputSize = 0;
+        while (input.position < buffer.length) {
+            int length = input.integer(), first = input.integer(), last = input.integer();
+            if (length < 0 || length > 0x40000 || first < 0 || first > length
+                    || last < 0 || last > length) throw new IOException("Invalid BWT block");
+            input.skip(length + 1);
+            if (length > bound - outputSize) throw new IOException("BWT expansion too large");
+            outputSize += length;
+        }
+        byte[] output = new byte[outputSize];
+        int outputPosition = 0;
+        input = new Cursor(buffer);
         while (input.position < buffer.length) {
             int length = input.integer(), first = input.integer(), last = input.integer();
             if (length < 0 || length > 0x40000 || first < 0 || first > length
@@ -152,10 +166,9 @@ public final class Ut99RedirectDownload {
                 int value = i == last ? 256 : buffer[start + i] & 255;
                 next[offsets[value] + counts[value]++] = i;
             }
-            if (length > bound - output.size()) throw new IOException("BWT expansion too large");
-            for (int node = first, i = 0; i < length; i++, node = next[node]) output.write(buffer[start + node]);
+            for (int node = first, i = 0; i < length; i++, node = next[node]) output[outputPosition++] = buffer[start + node];
         }
-        byte[] result = rle(output.toByteArray(), expected);
+        byte[] result = rle(output, expected);
         if (result.length != expected) throw new IOException("UZ size mismatch");
         return result;
     }
@@ -173,23 +186,42 @@ public final class Ut99RedirectDownload {
     }
 
     private static byte[] rle(byte[] data, int bound) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int size = rleSize(data, bound);
+        byte[] output = new byte[size];
+        int position = 0, previous = -1, run = 0;
+        for (int i = 0; i < data.length; i++) {
+            int value = data[i] & 255;
+            output[position++] = (byte)value;
+            run = value == previous ? run + 1 : 1;
+            previous = value;
+            if (run == 5) {
+                int extra = (data[++i] & 255) - 5;
+                Arrays.fill(output, position, position + extra, (byte)value);
+                position += extra;
+                run = 0;
+            }
+        }
+        return output;
+    }
+
+    private static int rleSize(byte[] data, int bound) throws IOException {
+        int size = 0;
         int previous = -1, run = 0;
         for (int i = 0; i < data.length; i++) {
             int value = data[i] & 255;
-            if (output.size() >= bound) throw new IOException("RLE expansion too large");
-            output.write(value);
+            if (size >= bound) throw new IOException("RLE expansion too large");
+            size++;
             run = value == previous ? run + 1 : 1;
             previous = value;
             if (run == 5) {
                 if (++i >= data.length) throw new IOException("Truncated RLE run");
                 int count = data[i] & 255;
-                if (count < 5 || count - 5 > bound - output.size()) throw new IOException("Invalid RLE run");
-                for (int j = 5; j < count; j++) output.write(value);
+                if (count < 5 || count - 5 > bound - size) throw new IOException("Invalid RLE run");
+                size += count - 5;
                 run = 0;
             }
         }
-        return output.toByteArray();
+        return size;
     }
 
     private static final class Cursor {

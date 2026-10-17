@@ -25,6 +25,12 @@ public final class RedirectDownloadAudit {
         byte[] expected = Files.readAllBytes(Paths.get(args[0]));
         byte[] compressed = Files.readAllBytes(Paths.get(args[1]));
         check(Arrays.equals(expected, Ut99RedirectDownload.decodeUz(compressed, expected.length)), "UZ bytes differ");
+        // Large real packages can be checked with -Xmx256m without also
+        // retaining the HTTP fixture server's buffers and concurrent jobs.
+        if (args.length > 2 && "--decode-only".equals(args[2])) {
+            System.out.println("PASS: exact UZ bytes within configured Java heap");
+            return;
+        }
         for (int length : new int[]{0, 1, 4, 20, compressed.length / 2}) {
             try {
                 Ut99RedirectDownload.decodeUz(Arrays.copyOf(compressed, length), expected.length);
