@@ -43,6 +43,10 @@ private:
 	BYTE*			LocalSourceBitmap;
 	TMap< UTexture*, TArray< BYTE > >*	PaletteMap;
 	FLOAT			LocalTime;
+#if defined(PLATFORM_ANDROID)
+    TArray<INT> NativeScratch4;
+    TArray<INT> NativeScratch5;
+#endif
 };
 
 

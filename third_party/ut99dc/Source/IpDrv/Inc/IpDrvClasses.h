@@ -50,12 +50,24 @@ class IPDRV_API AInternetLink : public AInternetInfo
 {
 public:
     BYTE LinkMode;
+#if defined(PLATFORM_ANDROID)
+    PTRINT Socket;
+#else
     INT Socket;
+#endif
     INT Port;
+#if defined(PLATFORM_ANDROID)
+    PTRINT RemoteSocket;
+#else
     INT RemoteSocket;
+#endif
     PTRINT PrivateResolveInfo; // Really a FResolveInfo*; script placeholder is widened by UStruct::Link.
     INT DataPending;
     BYTE ReceiveMode;
+#if defined(PLATFORM_ANDROID)
+    BYTE TextEncoding;
+    void StaticConstructor();
+#endif
     DECLARE_FUNCTION(execGetLocalIP);
     DECLARE_FUNCTION(execValidate);
     DECLARE_FUNCTION(execStringToIpAddr);

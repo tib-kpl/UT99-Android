@@ -172,6 +172,11 @@ private:
     FStringNoInit fpsText;
     FStringNoInit SecondsText;
     FStringNoInit FramesText;
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bControlDown:1 GCC_PACK(4);
+    INT TypeCursorOffset;
+    void StaticConstructor();
+#endif
 };
 
 /*------------------------------------------------------------------------------

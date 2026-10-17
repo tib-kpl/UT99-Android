@@ -259,7 +259,11 @@ UBOOL ATcpLink::Tick( FLOAT DeltaTime, enum ELevelTick TickType )
 		}
 	}
 
+#if defined(PLATFORM_ANDROID)
+    PTRINT* CheckSocket;
+#else
 	INT* CheckSocket;
+#endif
 	switch( LinkState )
 	{
 		case STATE_Connecting:

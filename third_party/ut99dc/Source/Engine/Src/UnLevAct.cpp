@@ -286,9 +286,9 @@ UBOOL ULevel::DestroyActor( AActor* ThisActor, UBOOL bNetForce )
 			}
 			else
 			{
-				for( INT j=0; j<ARRAY_COUNT(Other->Touching); j++ )
+				for( INT j=0; j<Other->TouchCount(); j++ )
 				{
-					if( Other->Touching[j]==ThisActor )
+					if( Other->TouchAt(j)==ThisActor )
 					{
 						ThisActor->EndTouch( Other, 1 );
 						if( ThisActor->bDeleteMe )
@@ -1016,9 +1016,9 @@ UBOOL ULevel::MoveActor
 					Actor->BeginTouch( Test->Actor );
 
 		// UnTouch notifications.
-		for( int i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
-			if( Actor->Touching[i] && !Actor->IsOverlapping(Actor->Touching[i]) )
-				Actor->EndTouch( Actor->Touching[i], 0 );
+		for( int i=0; i<Actor->TouchCount(); i++ )
+			if( Actor->TouchAt(i) && !Actor->IsOverlapping(Actor->TouchAt(i)) )
+				Actor->EndTouch( Actor->TouchAt(i), 0 );
 	}
 
 	// Set actor zone.
@@ -1101,9 +1101,9 @@ UBOOL ULevel::CheckEncroachment
 	if( bTouchNotify )
 	{
 		// UnTouch notifications.
-		for( int i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
-			if( Actor->Touching[i] && !Actor->IsOverlapping(Actor->Touching[i]) )
-				Actor->EndTouch( Actor->Touching[i], 0 );
+		for( int i=0; i<Actor->TouchCount(); i++ )
+			if( Actor->TouchAt(i) && !Actor->IsOverlapping(Actor->TouchAt(i)) )
+				Actor->EndTouch( Actor->TouchAt(i), 0 );
 	}
 
 	// Notify the encroached actors but not the level.

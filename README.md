@@ -82,7 +82,7 @@ OldUnreal reste partielle : voir [la compatibilité GOTY](docs/GOTY_COMPATIBILIT
 - Android 4.1 / API 16 or newer.
 - A compatible device.
 - Android-compatible game controller recommended.
-- Original Unreal Tournament / UT99 [PC game data v400](https://archive.org/download/ut-99_202512/UT99.iso).
+- Original Unreal Tournament / UT99 PC game data: v400 or a complete GOTY/OldUnreal installation. See [compatibility and limitations](docs/GOTY_COMPATIBILITY.md).
 
 Required game data folders:
 

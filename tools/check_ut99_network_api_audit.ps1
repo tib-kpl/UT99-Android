@@ -2,7 +2,8 @@ param([Parameter(Mandatory=$true)][string[]]$ClientLogs,[switch]$Network)
 $ErrorActionPreference='Stop'
 $checks=@('empty-hooks','empty-message','end-chain','restart-chain','pickup-out',
     'death-parameters','login-out','team-parameters','broadcast-out','localized-out',
-    'pause-parameters','hud-key-base','message-window-field','hud-register-once')
+    'pause-parameters','hud-key-base','message-window-field','hud-register-once',
+    'decal-no-surface-destroys','pock-no-surface-defers-destroy','shield-removes-other-armor')
 if($Network) { $checks+= 'initial-event' }
 foreach($file in $ClientLogs) {
     $text=[IO.File]::ReadAllText((Resolve-Path -LiteralPath $file))

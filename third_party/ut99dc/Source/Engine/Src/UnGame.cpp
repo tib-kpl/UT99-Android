@@ -17,6 +17,7 @@ static FString AndroidLastNetworkError;
 static void AndroidReportNetworkError(UGameEngine* Engine, const FString& Detail)
 {
 	AndroidLastNetworkError=Detail;
+	debugf(NAME_Warning,TEXT("Android network connection failed: %s"),*Detail);
 	if( Engine->Client && Engine->Client->Viewports.Num() && Engine->Client->Viewports(0)->Console )
 	{
 		UConsole* Console=Engine->Client->Viewports(0)->Console;
@@ -1585,8 +1586,8 @@ ULevel* UGameEngine::LoadMap( const FURL& URL, UPendingLevel* Pending, const TMa
 		// Init touching actors.
 		for( INT i=0; i<GLevel->Actors.Num(); i++ )
 			if( GLevel->Actors(i) )
-				for( INT j=0; j<ARRAY_COUNT(GLevel->Actors(i)->Touching); j++ )
-					GLevel->Actors(i)->Touching[j] = NULL;
+				for( INT j=0; j<GLevel->Actors(i)->TouchCount(); j++ )
+					GLevel->Actors(i)->TouchAt(j) = NULL;
 
 		// Kill off actors that aren't interesting to the client.
 		INT i;

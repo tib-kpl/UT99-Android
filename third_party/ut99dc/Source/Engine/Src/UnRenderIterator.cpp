@@ -9,6 +9,9 @@
 URenderIterator::URenderIterator()
 :	Index( 0 ),
 	Observer( NULL )
+#if defined(PLATFORM_ANDROID)
+    , Frame( NULL )
+#endif
 {
 	guard(URenderIterator::URenderIterator);
 

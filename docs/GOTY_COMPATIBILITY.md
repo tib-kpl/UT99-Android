@@ -1,14 +1,30 @@
 # GOTY / OldUnreal : compatibilité du moteur Android
 
 La branche `master` conserve le moteur Android natif avec deux menus au choix.
-Elle ne
-remplace pas le moteur par la version Linux et ne prétend pas exécuter les
-packages système du moteur OldUnreal 469.
+Le moteur reste le portage Android v400, complété pour charger les packages
+système v68 et v69. Aucun moteur Linux n'est exécuté.
+
+Une installation complète OldUnreal 469f-rc5 a été testée sur ARM64 et ARMv7,
+avec ses packages Core, Engine, Botpack et ses interfaces d'origine. Il faut
+importer l'installation complète, avec ses textures de polices récentes ;
+l'archive de mise à jour seule ne contient pas tout le jeu.
+
+Les essais couvrent le tournoi solo, une partie LAN dans les deux sens et
+plusieurs serveurs publics, dont des serveurs Nexgen et MonsterHunt. Les
+contrôles isolés vérifient aussi 54 comportements du moteur sur les deux ABI.
+Cela ne garantit pas tous les serveurs ni toutes les extensions 469 : les
+mods natifs et antitriche, la réplication des tableaux dynamiques, certaines
+extensions d'animation squelettique et les nouvelles options d'encodage réseau
+restent hors de cette validation. Un serveur imposant une version minimale
+supérieure à celle annoncée par le portage peut encore refuser la connexion.
 
 ## Données récentes
 
-Les cartes, textures, sons et musiques de l'installation GOTY peuvent être
-préparés avec les packages système v400 correspondant au moteur Android :
+Le lanceur accepte directement les données d'une installation complète récente
+ou les données v400. Les fichiers du jeu ne sont pas intégrés à l'APK.
+
+Pour conserver volontairement les anciens packages système, la préparation
+suivante reste disponible en alternative :
 
 ```powershell
 ./tools/prepare_ut99_goty_data.ps1 `
@@ -25,10 +41,10 @@ Les fichiers du jeu ne sont pas intégrés à l'APK ni publiés sur GitHub.
 Le script conserve le `System` compatible et prend les quatre dossiers de
 contenu dans l'installation GOTY. Les packages supplémentaires `de`,
 `epiccustommodels` et `multimesh` passent également le chargement v400.
-Les packages modernes
-`Core`, `Engine`, `Botpack`, les interfaces et les autres packages système
-ne sont pas substitués : ils nécessitent encore un portage distinct.
-Les fonctionnalités propres au moteur 469 nécessitent encore des adaptations.
+Ce script conserve volontairement les anciens `Core`, `Engine`, `Botpack`
+et interfaces ; il n'est pas nécessaire pour importer une installation récente
+complète. Le lanceur conserve les interfaces récentes lorsqu'il détecte
+Engine v69 et ajoute uniquement les packages propres au menu console.
 Relics et les personnages squelettiques demandent les extensions Android
 décrites ci-dessous, présentes dans cette branche.
 

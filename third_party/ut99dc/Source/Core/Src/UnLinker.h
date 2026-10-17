@@ -635,6 +635,29 @@ class ULinkerLoad : public ULinker, public FArchive
 				break;
 			}
 		}
+#if defined(PLATFORM_ANDROID)
+        // A v69 array<T,N> explicitly advertises its legacy static extent.
+        // Permit only matching scalar-property imports with that metadata.
+        if(Import.SourceIndex==INDEX_NONE && Import.PackageIndex<0
+        && Import.ClassPackage==NAME_Core && Import.SourceLinker->Ver()==69)
+        {
+            FObjectImport& Parent=ImportMap(-Import.PackageIndex-1);
+            if(Parent.ClassName==NAME_Class && Parent.SourceIndex>=0)
+            {
+                INT Candidate=Import.SourceLinker->FindExportIndex(FName(TEXT("ArrayProperty")),NAME_Core,Import.ObjectName,Parent.SourceIndex+1);
+                if(Candidate>=0)
+                {
+                    UArrayProperty* Array=Cast<UArrayProperty>(Import.SourceLinker->CreateExport(Candidate));
+                    if(Array)
+                    {
+                        Import.SourceLinker->Preload(Array);
+                        if(Array->StaticArrayDim>0 && Array->Inner && Array->Inner->GetClass()->GetFName()==Import.ClassName)
+                            Import.SourceIndex=Candidate;
+                    }
+                }
+            }
+        }
+#endif
 		if( appStricmp(*Import.ClassName,TEXT("Mesh"))==0 )//oldver
 		{
 			Import.ClassName=FName(TEXT("LodMesh"));
@@ -668,7 +691,9 @@ class ULinkerLoad : public ULinker, public FArchive
 			&& ((Pkg->GetFName()==NAME_Core && LegacyScriptCompat::SupportedCore(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))
 			 || (Pkg->GetFName()==NAME_Engine && LegacyScriptCompat::Supported(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))
 			 || (Pkg->GetFName()==FName(TEXT("Botpack")) && appStricmp(*Parent.ObjectName,TEXT("ChallengeHUD"))==0
-			   && LegacyScriptCompat::SupportedHUD(Import.ClassName,*Import.ObjectName))) )
+			   && LegacyScriptCompat::SupportedHUD(Import.ClassName,*Import.ObjectName))
+			 || (Pkg->GetFName()==FName(TEXT("Botpack"))
+			   && LegacyScriptCompat::SupportedBotpack(*Parent.ObjectName,Import.ClassName,*Import.ObjectName))) )
 			{
 				UClass* Owner = Cast<UClass>(CreateImport(-Import.PackageIndex-1));
 				if( Owner )

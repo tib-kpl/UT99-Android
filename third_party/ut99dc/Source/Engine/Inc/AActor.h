@@ -4,8 +4,15 @@
 =============================================================================*/
 
 	// Constructors.
+#if defined(PLATFORM_ANDROID)
+    AActor() : ModernTouching(E_NoInit) {}
+#else
 	AActor() {}
+#endif
 	void Destroy();
+	UBOOL UsesModernTouching() const;
+	INT TouchCount() const;
+	AActor*& TouchAt(INT Index);
 
 	// UObject interface.
 	virtual INT* GetOptimizedRepList( BYTE* InDefault, FPropertyRetirement* Retire, INT* Ptr, UPackageMap* Map );

@@ -38,6 +38,10 @@ simulated event Timer()
     local Object Optional;
     local PlayerPawn P;
     local float SavedMessageTime;
+    local DecalProbe D;
+    local PockProbe Mark;
+    local UT_ShieldBelt Belt, NewBelt;
+    local Armor2 Armor;
 
     if (bTested) return;
     bTested=true;
@@ -77,6 +81,27 @@ simulated event Timer()
             P.myHUD.HUDMutator=Root.NextHUDMutator;
             break;
         }
+    D=Spawn(class'DecalProbe');
+    if(D!=None) { D.Texture=None; D.AttachToSurface(); }
+    Check(D!=None && D.bDeleteMe,"decal-no-surface-destroys");
+    Mark=Spawn(class'PockProbe');
+    if(Mark!=None) { Mark.Texture=None; Mark.AttachToSurface(); }
+    Check(Mark!=None && !Mark.bDeleteMe && !Mark.bAttached,"pock-no-surface-defers-destroy");
+    if(Mark!=None) Mark.Destroy();
+    Belt=Spawn(class'UT_ShieldBelt');
+    NewBelt=Spawn(class'UT_ShieldBelt');
+    Armor=Spawn(class'Armor2');
+    if(Belt!=None && NewBelt!=None && Armor!=None)
+    {
+        Belt.SetOwner(Root);
+        Armor.SetOwner(Root);
+        Root.Inventory=Belt;
+        Belt.Inventory=Armor;
+        Check(Belt.HandlePickupQuery(NewBelt) && Armor.bDeleteMe && !Belt.bDeleteMe,"shield-removes-other-armor");
+        Belt.Destroy(); NewBelt.Destroy();
+        Root.Inventory=None;
+    }
+    else Check(false,"shield-removes-other-armor");
     Root.Destroy(); Relay.Destroy(); Leaf.Destroy();
     Log("NET_API COMPLETE");
 }

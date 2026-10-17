@@ -3,6 +3,7 @@ project(Core CXX)
 set(SRC_FILES
   "Src/UnProp.cpp"
   "Src/UnObj.cpp"
+  "Src/UnRegistry.cpp"
   "Src/UnCorSc.cpp"
   "Src/UnName.cpp"
   "Src/UnMem.cpp"

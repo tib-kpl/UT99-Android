@@ -12,6 +12,49 @@
 #include "SDL_system.h"
 #include <unistd.h>
 
+#include "SDL.h"
+#include <stdlib.h>
+
+extern "C" int UT99AndroidDesktopDPI()
+{
+    float DPI=96.f;
+    if(SDL_GetDisplayDPI(0,&DPI,NULL,NULL)!=0 || !(DPI>=48.f && DPI<=1000.f)) DPI=96.f;
+    return (int)(DPI+0.5f);
+}
+
+extern "C" void UT99AndroidTextInput(int Start)
+{
+    if(Start) SDL_StartTextInput(); else SDL_StopTextInput();
+}
+
+extern "C" int* UT99AndroidFontPage(int Family,int Size,int Flags,const unsigned short* Glyphs,int Count,int* Length)
+{
+    *Length=0;
+    JNIEnv* Env=(JNIEnv*)SDL_AndroidGetJNIEnv();
+    if(!Env || Count<1 || Count>256) return NULL;
+    jclass C=Env->FindClass("com/ast/ut99/Ut99DynamicFont");
+    if(!C) { Env->ExceptionClear(); return NULL; }
+    jmethodID M=Env->GetStaticMethodID(C,"build","(IIILjava/lang/String;)[I");
+    jstring Text=Env->NewString((const jchar*)Glyphs,Count);
+    jintArray Data=M && Text ? (jintArray)Env->CallStaticObjectMethod(C,M,Family,Size,Flags,Text) : NULL;
+    if(Env->ExceptionCheck()) { Env->ExceptionClear(); Data=NULL; }
+    int* Result=NULL;
+    if(Data)
+    {
+        int N=Env->GetArrayLength(Data);
+        if(N>0 && N<=4*1024*1024+1026)
+        {
+            Result=(int*)malloc(N*sizeof(int));
+            if(Result) { Env->GetIntArrayRegion(Data,0,N,(jint*)Result); *Length=N; }
+        }
+        Env->DeleteLocalRef(Data);
+    }
+    if(Text) Env->DeleteLocalRef(Text);
+    Env->DeleteLocalRef(C);
+    return Result;
+}
+extern "C" void UT99AndroidFreeFontPage(int* Data) { free(Data); }
+
 extern "C" int UT99AndroidRedirectStart(const char* Address,const char* Path,int Size,int Compressed)
 {
     JNIEnv* Env=(JNIEnv*)SDL_AndroidGetJNIEnv();

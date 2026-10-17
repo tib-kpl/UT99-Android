@@ -16,6 +16,9 @@ class ENGINE_API URenderIterator : public UObject
 	INT				MaxItems;
 	INT				Index;
 	APlayerPawn*	Observer;
+#if defined(PLATFORM_ANDROID)
+    FSceneNode* Frame;
+#endif
 
 	// Constructor.
 	URenderIterator();

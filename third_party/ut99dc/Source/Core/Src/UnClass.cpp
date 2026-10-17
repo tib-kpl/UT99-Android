@@ -8,6 +8,51 @@
 
 #include "CorePrivate.h"
 
+#if defined(PLATFORM_ANDROID)
+static INT GetPlaceholderSize(UStruct* Owner,UProperty* Property);
+struct FAndroidNativeFieldLayout
+{
+    UStruct* Owner;
+    FName Name,Type;
+    INT Offset,Size,Capacity;
+    DWORD BoolMask;
+};
+static TArray<FAndroidNativeFieldLayout>& AndroidNativeLayouts()
+{
+    static TArray<FAndroidNativeFieldLayout> Fields;
+    return Fields;
+}
+void UT99RegisterNativeFieldLayout(UStruct* Owner,const TCHAR* Name,const TCHAR* Type,INT Offset,INT Size,DWORD BoolMask,INT Capacity)
+{
+    FAndroidNativeFieldLayout& Field=*new(AndroidNativeLayouts())FAndroidNativeFieldLayout;
+    Field.Owner=Owner; Field.Name=Name; Field.Type=Type; Field.Offset=Offset; Field.Size=Size; Field.BoolMask=BoolMask; Field.Capacity=Capacity;
+}
+static UBOOL HasAndroidNativeLayout(UStruct* Owner)
+{
+    TArray<FAndroidNativeFieldLayout>& Fields=AndroidNativeLayouts();
+    for(INT Index=0;Index<Fields.Num();++Index) if(Fields(Index).Owner==Owner) return 1;
+    return 0;
+}
+static void ApplyAndroidNativeLayout(UStruct* Owner,UProperty* Property,INT NativeSize)
+{
+    TArray<FAndroidNativeFieldLayout>& Fields=AndroidNativeLayouts();
+    for(INT Index=0;Index<Fields.Num();++Index)
+    {
+        const FAndroidNativeFieldLayout& Field=Fields(Index);
+        if(Field.Owner!=Owner || Field.Name!=Property->GetFName() || Field.Type!=Property->GetClass()->GetFName()) continue;
+        INT Base=Owner->GetInheritanceSuper() ? Owner->GetInheritanceSuper()->GetPropertiesSize() : 0;
+        if(Field.Size/Field.Capacity!=Property->ElementSize && GetPlaceholderSize(Owner,Property)==Field.Size)
+            Property->ElementSize=Field.Size/Property->ArrayDim;
+        if(Property->ArrayDim>Field.Capacity || Property->ArrayDim<1 || Field.Size/Field.Capacity!=Property->ElementSize || Field.Offset<Base || Field.Offset>NativeSize-Field.Size)
+            appErrorf(TEXT("Native member layout mismatch for %s.%s (size %i, expected %i)"),Owner->GetName(),Property->GetName(),Property->GetSize(),Field.Size);
+        Property->Offset=Field.Offset;
+        if(UBoolProperty* Bool=Cast<UBoolProperty>(Property)) Bool->BitMask=Field.BoolMask;
+        return;
+    }
+    appErrorf(TEXT("Unsupported native member %s.%s (%s)"),Owner->GetName(),Property->GetName(),Property->GetClass()->GetName());
+}
+#endif
+
 #define VF_HASH_VARIABLES 0 /* Undecided!! */
 
 /*-----------------------------------------------------------------------------
@@ -337,6 +382,11 @@ void UStruct::Register()
 static INT GetPlaceholderSize( UStruct* Owner, UProperty* Property )
 {
 	static const INT ObjectInternalSize = 4*sizeof(void*) + 2*sizeof(INT);
+#if defined(PLATFORM_ANDROID)
+    // ObjectInternal represents a mixed native header, not six native pointers.
+    if(Property->IsA(UPointerProperty::StaticClass())
+    && (appStricmp(Owner->GetName(),TEXT("Object")) || appStricmp(Property->GetName(),TEXT("ObjectInternal")))) return 0;
+#endif
 	static const struct { const TCHAR* Struct; const TCHAR* Prop; INT Size; } Placeholders[] =
 	{
 		{ TEXT("Object"),          TEXT("ObjectInternal"),     ObjectInternalSize },
@@ -350,6 +400,8 @@ static INT GetPlaceholderSize( UStruct* Owner, UProperty* Property )
 		{ TEXT("ScriptedTexture"), TEXT("Junk2"),              sizeof(void*) },
 		{ TEXT("ScriptedTexture"), TEXT("Junk3"),              sizeof(void*) },
 		{ TEXT("InternetLink"),    TEXT("PrivateResolveInfo"), sizeof(void*) },
+        { TEXT("InternetLink"), TEXT("Socket"), sizeof(void*) },
+        { TEXT("InternetLink"), TEXT("RemoteSocket"), sizeof(void*) },
 		{ TEXT("StatLog"),         TEXT("Context"),            sizeof(void*) },
 		{ TEXT("StatLogFile"),     TEXT("LogAr"),              sizeof(void*) },
 		{ TEXT("WaterTexture"),    TEXT("SourceFields"),       sizeof(void*) },
@@ -369,6 +421,9 @@ static INT GetPlaceholderSize( UStruct* Owner, UProperty* Property )
 void UStruct::Link( FArchive& Ar, UBOOL Props )
 {
 	guard(UStruct::Link);
+#if defined(PLATFORM_ANDROID)
+    const UBOOL NativeLayout=HasAndroidNativeLayout(this);
+#endif
 
 #if defined(PLATFORM_ANDROID)
 	LegacyScriptCompat::Extend(this,Ar,Props);
@@ -404,9 +459,17 @@ void UStruct::Link( FArchive& Ar, UBOOL Props )
 					Property->Link( Ar, Prev );
 					PropertiesSize = Property->Offset + Property->GetSize();
 				}
+#if defined(PLATFORM_ANDROID)
+                if(NativeLayout) ApplyAndroidNativeLayout(this,Property,IntrinsicSize);
+#endif
 				Prev = Property;
 			}
 		}
+#if defined(PLATFORM_ANDROID)
+        // Every script property was checked against a real C++ member above.
+        // The remainder may contain opaque native members with no script field.
+        if(NativeLayout) PropertiesSize=IntrinsicSize;
+#endif
 		PropertiesSize = Align(PropertiesSize,4);
 
 		// A mismatch means C++ and UnrealScript would address members at
@@ -425,7 +488,7 @@ void UStruct::Link( FArchive& Ar, UBOOL Props )
 			appErrorf
 			(
 				TEXT("Native class layout mismatch for %s (package=%i, C++=%i). ")
-				TEXT("Install the v400 game packages that match this engine build."),
+				TEXT("Use a complete UT99 installation compatible with this engine build."),
 				GetName(),
 				PropertiesSize,
 				IntrinsicSize
@@ -1566,6 +1629,26 @@ void UFunction::Bind()
 		TCHAR Proc[256];
 		appSprintf( Proc, TEXT("int%sexec%s"), GetOwnerClass()->GetNameCPP(), GetName() );
 		UPackage* ClassPackage = GetOwnerClass()->GetOuterUPackage();
+#if defined(PLATFORM_ANDROID)
+		// This later Botpack override is synthesized only for v400 packages.
+		// Its implementation lives in Engine; never redirect an on-disk function.
+		if((GetFlags()&RF_Transient) && GetFName()==FName(TEXT("HandlePickupQuery"))
+		&& GetOwnerClass()->GetFName()==FName(TEXT("UT_ShieldBelt"))
+		&& ClassPackage->GetFName()==FName(TEXT("Botpack")))
+		{
+			ClassPackage=FindObject<UPackage>(NULL,TEXT("Engine"));
+			check(ClassPackage);
+			appStrcpy(Proc,TEXT("intAInventoryexecCompatShieldPickupQuery"));
+		}
+		if((GetFlags()&RF_Transient) && GetFName()==FName(TEXT("AttachToSurface"))
+		&& GetOwnerClass()->GetFName()==FName(TEXT("Pock"))
+		&& ClassPackage->GetFName()==FName(TEXT("Botpack")))
+		{
+			ClassPackage=FindObject<UPackage>(NULL,TEXT("Engine"));
+			check(ClassPackage);
+			appStrcpy(Proc,TEXT("intADecalexecCompatPockAttachToSurface"));
+		}
+#endif
 #if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
 		// UT99_ANDROID_V104_UWEB_NATIVEFUNC_GUARD:
 		// UWeb may still be loaded by old saved configs or mods even though WebAdmin

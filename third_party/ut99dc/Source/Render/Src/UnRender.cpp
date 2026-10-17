@@ -33,6 +33,8 @@ DWORD 								URender::Stamp;
 FMemStack							URender::VectorMem;
 URender::FStampedPoint*				URender::PointCache;
 URender::FDynamicsCache*			URender::DynamicsCache;
+static INT RenderNodeCapacity=MAX_NODES;
+static INT RenderPointCapacity=MAX_POINTS;
 INT									URender::NumDynLightSurfs;
 INT									URender::NumDynLightLeaves;
 INT									URender::MaxSurfLights;
@@ -151,8 +153,12 @@ void URender::Destroy()
 	GDynMem.Exit();
 	GSceneMem.Exit();
 
-	delete PointCache;
-	delete DynamicsCache;
+	delete[] PointCache;
+	delete[] DynamicsCache;
+	PointCache=NULL;
+	DynamicsCache=NULL;
+	RenderNodeCapacity=MAX_NODES;
+	RenderPointCapacity=MAX_POINTS;
 	if( SurfLights ) appFree(SurfLights);
 	if( LeafLights ) appFree(LeafLights);
 
@@ -509,6 +515,37 @@ static FMemMark Mark;
 void URender::PreRender( FSceneNode* Frame )
 {
 	guard(URender::PreRender);
+#if defined(PLATFORM_ANDROID)
+	// Reserve before any frame/portal stores pointers into these caches.
+	// A loaded warp-zone destination may have a larger BSP than the main view.
+	INT Nodes=RenderNodeCapacity, Points=RenderPointCapacity;
+	for(TObjectIterator<ULevel> It; It; ++It)
+		if(It->Model)
+		{
+			Nodes=Max(Nodes,It->Model->Nodes.Num());
+			Points=Max(Points,It->Model->Points.Num());
+		}
+	if(Nodes>MAXINT/(INT)sizeof(FDynamicsCache) || Points>MAXINT/(INT)sizeof(FStampedPoint))
+		appErrorf(TEXT("BSP render cache exceeds addressable allocation size"));
+	if(Nodes>RenderNodeCapacity)
+	{
+		FDynamicsCache* Cache=new(TEXT("FDynamicsCache"))FDynamicsCache[Nodes];
+		appMemzero(Cache,Nodes*sizeof(FDynamicsCache));
+		delete[] DynamicsCache;
+		DynamicsCache=Cache;
+		RenderNodeCapacity=Nodes;
+		debugf(TEXT("Android BSP render node cache expanded to %i"),Nodes);
+	}
+	if(Points>RenderPointCapacity)
+	{
+		FStampedPoint* Cache=new(TEXT("FStampedPoint"))FStampedPoint[Points];
+		for(INT I=0;I<Points;++I) { Cache[I].Point=NULL; Cache[I].Stamp=Stamp; }
+		delete[] PointCache;
+		PointCache=Cache;
+		RenderPointCapacity=Points;
+		debugf(TEXT("Android BSP render point cache expanded to %i"),Points);
+	}
+#endif
 
 	// Init stats.
 	STAT(appMemzero(&GStat,sizeof(GStat)));
@@ -1938,8 +1975,8 @@ void URender::OccludeBsp( FSceneNode* Frame )
 	INT                 NumActiveZones;
 	BYTE                ActiveZones[64];
 	guard(URender::OccludeBsp);
-	check(Frame->Level->Model->Nodes.Num()<=MAX_NODES);
-	check(Frame->Level->Model->Points.Num()<=MAX_POINTS);
+	check(Frame->Level->Model->Nodes.Num()<=RenderNodeCapacity);
+	check(Frame->Level->Model->Points.Num()<=RenderPointCapacity);
 
 	// If unrenderable.
 	Model = Frame->Level->Model;

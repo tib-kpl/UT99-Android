@@ -28,6 +28,9 @@ Le scénario vérifie les valeurs par défaut, les appels `Super`, le chaînage
 sur deux mutateurs et les paramètres de sortie : booléens, octets, noms,
 classes, objets, chaînes et vecteurs. Il vérifie aussi l'inscription unique
 au HUD, son traitement de touches de base et `PlayerPawn.LastMessageWindow`.
+Les sondes de décalques vérifient la destruction immédiate sans surface pour
+`Decal`, et la destruction différée pour `Pock`. Le test du bouclier vérifie
+la suppression des autres armures et le résultat de la chaîne d’inventaire.
 L'événement `PostNetBeginPlay` doit être appelé une seule fois et lire la
 valeur initiale répliquée `469`, différente de sa valeur par défaut `0`.
 
@@ -38,9 +41,9 @@ tamponné), puis exécuter :
 ./tools/check_ut99_network_api_audit.ps1 -ClientLogs @('./build/client-arm64.log','./build/client-arm32.log') -Network
 ```
 
-Chaque client doit produire exactement un PASS pour les 15 contrôles et
+Chaque client doit produire exactement un PASS pour les 18 contrôles et
 `NET_API COMPLETE`, sans FAIL ni erreur critique. Un lancement solo avec
-la même URL permet de tester les 14 contrôles sans événement réseau ;
+la même URL permet de tester les 17 contrôles sans événement réseau ;
 omettre alors `-Network`. Retirer le mutateur et toute URL de diagnostic
 après les essais.
 

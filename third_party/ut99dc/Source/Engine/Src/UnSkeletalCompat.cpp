@@ -5,6 +5,14 @@
 IMPLEMENT_CLASS(UAnimation);
 IMPLEMENT_CLASS(USkeletalMesh);
 
+void AActor::execLinkSkelAnim(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_OBJECT(UAnimation,Animation);
+    P_FINISH;
+    SkelAnim=Animation;
+    // Keep the per-actor animation reference independent of the shared asset.
+}
+
 void UAnimation::Serialize(FArchive& Ar)
 {
     Super::Serialize(Ar);

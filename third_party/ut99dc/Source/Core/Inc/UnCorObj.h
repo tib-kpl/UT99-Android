@@ -153,4 +153,17 @@ class CORE_API USystem : public USubsystem
 	The End.
 ----------------------------------------------------------------------------*/
 
+#if defined(PLATFORM_ANDROID)
+class CORE_API URegistry : public UObject
+{
+    DECLARE_CLASS(URegistry,UObject,CLASS_Abstract)
+public:
+    URegistry() {}
+    DECLARE_FUNCTION(execGetRegistryObjects)
+    DECLARE_FUNCTION(execGetPreferences)
+    DECLARE_FUNCTION(execGetRegistryProperties)
+    DECLARE_FUNCTION(execLoadRegistryProperty)
+};
+#endif
+
 #pragma pack (pop)

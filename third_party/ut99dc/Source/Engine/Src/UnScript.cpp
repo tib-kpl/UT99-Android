@@ -1375,9 +1375,9 @@ void AActor::execTouchingActors( FFrame& Stack, RESULT_DECL )
 	PRE_ITERATOR;
 		// Fetch next actor in the iteration.
 		*OutActor = NULL;
-		for( iTouching; iTouching<ARRAY_COUNT(Touching) && *OutActor==NULL; iTouching++ )
+		for( iTouching; iTouching<TouchCount() && *OutActor==NULL; iTouching++ )
 		{
-			AActor* TestActor = Touching[iTouching];
+			AActor* TestActor = TouchAt(iTouching);
 			if(	TestActor && TestActor->IsA(BaseClass) )
 				*OutActor = TestActor;
 		}
@@ -2004,6 +2004,46 @@ static void CalcClippedNodes( UModel* Model, FBspSurf& Surf, FVector* DecalVerts
 	unguard;
 }
 
+static UBOOL AttachCompatDecal(ADecal* Decal, const FVector& Direction)
+{
+	UFunction* Attach=Decal->FindFunctionChecked(FName(TEXT("AttachDecal")));
+	BYTE* Parms=(BYTE*)appAlloca(Attach->ParmsSize);
+	appMemzero(Parms,Attach->ParmsSize);
+	UFloatProperty* Distance=FindField<UFloatProperty>(Attach,TEXT("TraceDistance"));
+	check(Distance);
+	*(FLOAT*)(Parms+Distance->Offset)=100.f;
+	UStructProperty* DecalDirection=FindField<UStructProperty>(Attach,TEXT("DecalDir"));
+	check(DecalDirection);
+	*(FVector*)(Parms+DecalDirection->Offset)=Direction;
+	Decal->ProcessEvent(Attach,Parms);
+	UProperty* Return=FindField<UProperty>(Attach,TEXT("ReturnValue"));
+	check(Return);
+	return Return->IsA(UObjectProperty::StaticClass())
+		? *(UObject**)(Parms+Return->Offset)!=NULL
+		: (*(BITFIELD*)(Parms+Return->Offset)&((UBoolProperty*)Return)->BitMask)!=0;
+}
+
+void ADecal::execAttachToSurface(FFrame& Stack, RESULT_DECL)
+{
+	guard(ADecal::execAttachToSurface);
+	P_FINISH;
+	if(!AttachCompatDecal(this,FVector(0,0,0))) GetLevel()->DestroyActor(this);
+	unguard;
+}
+
+void ADecal::execCompatPockAttachToSurface(FFrame& Stack, RESULT_DECL)
+{
+	guard(ADecal::execCompatPockAttachToSurface);
+	P_FINISH;
+	UBOOL Attached=AttachCompatDecal(this,FVector(0,0,1));
+	UBoolProperty* Property=FindField<UBoolProperty>(GetClass(),TEXT("bAttached"));
+	check(Property);
+	BITFIELD& Value=*(BITFIELD*)((BYTE*)this+Property->Offset);
+	if(Attached) Value|=Property->BitMask;
+	else Value&=~Property->BitMask;
+	unguard;
+}
+
 void ADecal::execAttachDecal( FFrame& Stack, RESULT_DECL )
 {
 	guard(ADecal::execAttachDecal);
@@ -2011,7 +2051,11 @@ void ADecal::execAttachDecal( FFrame& Stack, RESULT_DECL )
 	P_GET_VECTOR_OPTX(DecalDir,FVector(0,0,0));
 	P_FINISH;
 
-	*(INT*)Result = 0;
+	UFunction* AttachFunction=FindFunctionChecked(FName(TEXT("AttachDecal")));
+	UBOOL TextureResult=FindField<UObjectProperty>(AttachFunction,TEXT("ReturnValue"))!=NULL;
+	if(TextureResult) *(UTexture**)Result=NULL;
+	else *(INT*)Result=0;
+	UTexture* AttachedTexture=NULL;
 	if( !GetLevel()->Engine->Client || !GetLevel()->Engine->Client->Decals )
 		return;
 
@@ -2215,9 +2259,11 @@ void ADecal::execAttachDecal( FFrame& Stack, RESULT_DECL )
 		MainDecal->Vertices[1] -= SurfBase;
 		MainDecal->Vertices[2] -= SurfBase;
 		MainDecal->Vertices[3] -= SurfBase;
+		AttachedTexture=Surf.Texture;
 		unguard;
 	}
-	*(INT*)Result = 1;
+	if(TextureResult) *(UTexture**)Result=AttachedTexture;
+	else *(INT*)Result=1;
 #endif
 	unguard;
 }

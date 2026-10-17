@@ -319,6 +319,11 @@ class ENGINE_API UTexture : public UBitmap
 	TArray<FMipmap> Mips;			// Mipmaps in native format.
 	TArray<FMipmap> CompMips;		// Mipmaps in requested format.
 	BYTE            CompFormat;     // Decompressed texture format.
+#if defined(PLATFORM_ANDROID)
+    void* SourceMip GCC_PACK(4);
+    void* TextureHandle GCC_PACK(4);
+    INT RealtimeChangeCount;
+#endif
 
 	// Constructor.
 	UTexture();

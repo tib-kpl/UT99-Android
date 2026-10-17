@@ -429,7 +429,8 @@ function PaintMapPicker(Canvas C)
     ClipText(C, WinWidth*0.74-TextW*0.5, WinHeight*PreviewLabelY, S);
     C.Font = Root.Fonts[F_Normal];
     if(Picker != None) S = MapPickerHint;
-    else S = MapSettingHint;
+    else if(HasMapPreview()) S = MapSettingHint;
+    else S = HintText;
     TextSize(C, S, TextW, TextH);
     ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, S);
     DrawScrollIndicator(C);

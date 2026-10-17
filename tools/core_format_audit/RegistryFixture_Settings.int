@@ -1,0 +1,4 @@
+[Public]
+Object=(Name=UT99CoreFormatAudit.RegistryAudit,Class=Class,MetaClass=Engine.Mutator,Description="Registry audit")
+Preferences=(Caption="Fixture",Parent="UT99 compatibility audit",Class=UT99CoreFormatAudit.ConfigData,Category=Audit,Immediate=True)
+Property=(Class=UT99CoreFormatAudit.ConfigData,Name=Value,Title="A, quoted title",Description="Fixture description",Config,RequireRestart,Range(-2,8,0.5),Value("1=One"),Value("2=Two"))

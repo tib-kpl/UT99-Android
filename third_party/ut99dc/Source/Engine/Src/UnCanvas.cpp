@@ -8,6 +8,131 @@ Revision history:
 =============================================================================*/
 
 #include "EnginePrivate.h"
+#if defined(PLATFORM_ANDROID)
+extern "C" int UT99AndroidDesktopDPI();
+extern "C" int* UT99AndroidFontPage(int,int,int,const unsigned short*,int,int*);
+extern "C" void UT99AndroidFreeFontPage(int*);
+
+void UCanvas::execGetDesktopDPI(FFrame& Stack, RESULT_DECL)
+{
+    P_FINISH;
+    *(INT*)Result=UT99AndroidDesktopDPI();
+}
+
+void UCanvas::execCreateFont(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_BYTE(Family);
+    P_GET_INT(Size);
+    P_GET_UBOOL(Bold);
+    P_GET_UBOOL(Italic);
+    P_GET_UBOOL(Underlined);
+    P_GET_UBOOL(DPIScaled);
+    P_GET_UBOOL(AntiAliased);
+    P_FINISH;
+    *(UFont**)Result=NULL;
+    if(Family>3 || Size<1 || Size>128) return;
+    INT Pixels=DPIScaled ? Clamp(appRound(Size*UT99AndroidDesktopDPI()/96.f),1,128) : Size;
+    INT Flags=(Bold?1:0)|(Italic?2:0)|(Underlined?4:0)|(AntiAliased?8:0);
+    FString Range=GetDefault<UCanvas>()->DynamicFontUnicodeRange;
+    FString Name=FString::Printf(TEXT("AndroidFont_%i_%i_%i_%08x"),Family,Pixels,Flags,appStrCrc(*Range));
+    UFont* Existing=FindObject<UFont>(GetTransientPackage(),*Name);
+    if(Existing) { *(UFont**)Result=Existing; return; }
+    TArray<_WORD> Glyphs;
+    // Preserve ASCII indices, including the fallback space at index 32.
+    for(INT i=0;i<256;++i) Glyphs.AddItem((_WORD)i);
+    const TCHAR* Cursor=*Range;
+    while(*Cursor)
+    {
+        TCHAR* End=NULL;
+        INT First=appStrtoi(Cursor,&End,16);
+        if(End==Cursor) { ++Cursor; continue; }
+        Cursor=End;
+        INT Last=First;
+        if(*Cursor=='-') { ++Cursor; Last=appStrtoi(Cursor,&End,16); Cursor=End; }
+        if(First>=0 && Last>=First && Last<=65535)
+            for(INT Ch=First;Ch<=Last && Glyphs.Num()<8192;++Ch)
+                if((Ch<0xd800 || Ch>0xdfff) && Glyphs.FindItemIndex((_WORD)Ch)==INDEX_NONE)
+                    Glyphs.AddItem((_WORD)Ch);
+        while(*Cursor && *Cursor!=',') ++Cursor;
+        if(*Cursor) ++Cursor;
+    }
+    UFont* Font=new(GetTransientPackage())UFont;
+    Font->CharactersPerPage=256;
+    Font->HasGlyphMap=1;
+    for(INT Start=0;Start<Glyphs.Num();Start+=256)
+    {
+        INT Count=Min(256,Glyphs.Num()-Start), Length=0;
+        INT* Data=UT99AndroidFontPage(Family,Pixels,Flags,&Glyphs(Start),Count,&Length);
+        if(!Data) return;
+        INT Width=Data[0], Height=Data[1], Offset=2+Count*4;
+        if(Length<Offset || Width<1 || Width>4096 || Height<1 || Height>4096
+        || (Width&(Width-1)) || (Height&(Height-1)) || Width*Height!=Length-Offset)
+        { UT99AndroidFreeFontPage(Data); return; }
+        FFontPage* Page=new(Font->Pages)FFontPage;
+        Page->Characters.AddZeroed(Count);
+        Page->Texture=new(Font)UTexture;
+        UTexture* Texture=Page->Texture;
+        Texture->Init(Width,Height);
+        Texture->PolyFlags=PF_Masked;
+        Texture->PostLoad();
+        Texture->Palette->Colors.Empty();
+        Texture->Palette->Colors.AddZeroed(256);
+        for(INT i=0;i<256;++i) Texture->Palette->Colors(i)=FColor(i,i,i,i);
+        for(INT i=0;i<Width*Height;++i) Texture->Mips(0).DataArray(i)=(DWORD)Data[Offset+i]>>24;
+        Texture->CreateColorRange();
+        for(INT i=0;i<Count;++i)
+        {
+            FFontCharacter& Character=Page->Characters(i);
+            Character.StartU=Data[2+i*4]; Character.StartV=Data[3+i*4];
+            Character.USize=Data[4+i*4]; Character.VSize=Data[5+i*4];
+            Font->GlyphMap.Set(Glyphs(Start+i),(_WORD)(Start+i));
+        }
+        UT99AndroidFreeFontPage(Data);
+    }
+    Font->Rename(*Name);
+    *(UFont**)Result=Font;
+}
+
+#include "UnNativeLayoutMacros.h"
+void UCanvas::StaticConstructor()
+{
+    typedef UCanvas FLayoutClass;
+    BYTE Before[sizeof(FLayoutClass)];
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("BigFont"),TEXT("ObjectProperty"),STRUCT_OFFSET(FLayoutClass,BigFont),sizeof(BigFont),0,UT99NativeFieldCapacity(BigFont));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("ClipX"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,ClipX),sizeof(ClipX),0,UT99NativeFieldCapacity(ClipX));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("ClipY"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,ClipY),sizeof(ClipY),0,UT99NativeFieldCapacity(ClipY));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("CurX"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,CurX),sizeof(CurX),0,UT99NativeFieldCapacity(CurX));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("CurY"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,CurY),sizeof(CurY),0,UT99NativeFieldCapacity(CurY));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("CurYL"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,CurYL),sizeof(CurYL),0,UT99NativeFieldCapacity(CurYL));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("DrawColor"),TEXT("StructProperty"),STRUCT_OFFSET(FLayoutClass,Color),sizeof(Color),0,UT99NativeFieldCapacity(Color));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("DynamicFontUnicodeRange"),TEXT("StrProperty"),STRUCT_OFFSET(FLayoutClass,DynamicFontUnicodeRange),sizeof(DynamicFontUnicodeRange),0,UT99NativeFieldCapacity(DynamicFontUnicodeRange));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("Font"),TEXT("ObjectProperty"),STRUCT_OFFSET(FLayoutClass,Font),sizeof(Font),0,UT99NativeFieldCapacity(Font));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("FramePtr"),TEXT("IntProperty"),STRUCT_OFFSET(FLayoutClass,Frame),sizeof(Frame),0,UT99NativeFieldCapacity(Frame));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("FramePtr"),TEXT("PointerProperty"),STRUCT_OFFSET(FLayoutClass,Frame),sizeof(Frame),0,UT99NativeFieldCapacity(Frame));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("LargeFont"),TEXT("ObjectProperty"),STRUCT_OFFSET(FLayoutClass,LargeFont),sizeof(LargeFont),0,UT99NativeFieldCapacity(LargeFont));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("MedFont"),TEXT("ObjectProperty"),STRUCT_OFFSET(FLayoutClass,MedFont),sizeof(MedFont),0,UT99NativeFieldCapacity(MedFont));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("OrgX"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,OrgX),sizeof(OrgX),0,UT99NativeFieldCapacity(OrgX));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("OrgY"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,OrgY),sizeof(OrgY),0,UT99NativeFieldCapacity(OrgY));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("RenderPtr"),TEXT("IntProperty"),STRUCT_OFFSET(FLayoutClass,Render),sizeof(Render),0,UT99NativeFieldCapacity(Render));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("RenderPtr"),TEXT("PointerProperty"),STRUCT_OFFSET(FLayoutClass,Render),sizeof(Render),0,UT99NativeFieldCapacity(Render));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("SizeX"),TEXT("IntProperty"),STRUCT_OFFSET(FLayoutClass,X),sizeof(X),0,UT99NativeFieldCapacity(X));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("SizeY"),TEXT("IntProperty"),STRUCT_OFFSET(FLayoutClass,Y),sizeof(Y),0,UT99NativeFieldCapacity(Y));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("SmallFont"),TEXT("ObjectProperty"),STRUCT_OFFSET(FLayoutClass,SmallFont),sizeof(SmallFont),0,UT99NativeFieldCapacity(SmallFont));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("SpaceX"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,SpaceX),sizeof(SpaceX),0,UT99NativeFieldCapacity(SpaceX));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("SpaceY"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,SpaceY),sizeof(SpaceY),0,UT99NativeFieldCapacity(SpaceY));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("Style"),TEXT("ByteProperty"),STRUCT_OFFSET(FLayoutClass,Style),sizeof(Style),0,UT99NativeFieldCapacity(Style));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("UglyFontScaling"),TEXT("IntProperty"),STRUCT_OFFSET(FLayoutClass,UglyFontScaling),sizeof(UglyFontScaling),0,UT99NativeFieldCapacity(UglyFontScaling));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("Viewport"),TEXT("ObjectProperty"),STRUCT_OFFSET(FLayoutClass,Viewport),sizeof(Viewport),0,UT99NativeFieldCapacity(Viewport));
+    UT99RegisterNativeFieldLayout(GetClass(),TEXT("Z"),TEXT("FloatProperty"),STRUCT_OFFSET(FLayoutClass,Z),sizeof(Z),0,UT99NativeFieldCapacity(Z));
+    UT99_LAYOUT_BOOL(bCenter)
+    UT99_LAYOUT_BOOL(bNoSmooth)
+    UT99_LAYOUT_BOOL(bSnapToPixels)
+}
+#undef UT99_LAYOUT_BOOL
+#undef UT99_LAYOUT_FIELD
+#endif
+
+
 #include "UnRender.h"
 
 /*-----------------------------------------------------------------------------
@@ -36,6 +161,14 @@ void UCanvas::DrawTile
 )
 {
 	guard(UCanvas::DrawTile);
+#if defined(PLATFORM_ANDROID)
+    if(bSnapToPixels)
+    {
+        FLOAT Right=appRound(X+XL),Bottom=appRound(Y+YL);
+        X=appRound(X); Y=appRound(Y);
+        XL=Right-X; YL=Bottom-Y;
+    }
+#endif
 	check(Texture);
 
 	// Compute clipping region.
@@ -667,6 +800,9 @@ void UCanvas::Init( UViewport* InViewport )
 void UCanvas::Update( FSceneNode* InFrame )
 {
 	guard(UCanvas::Update);
+#if defined(PLATFORM_ANDROID)
+    UglyFontScaling=1;
+#endif
 
 	// Call UnrealScript to reset.
 	eventReset();

@@ -22,8 +22,10 @@ public final class RedirectDownloadAudit {
     }
 
     public static void main(String[] args) throws Exception {
-        byte[] expected = Files.readAllBytes(Paths.get(args[0]));
-        byte[] compressed = Files.readAllBytes(Paths.get(args[1]));
+        byte[] modernUz = java.util.Base64.getDecoder().decode("LhYAAAlzYW1wbGUudQAcAAAA/wAABgR4IEADA34QIIMCPRiwwYF/CBBDgjwUqKFBPwyYYcEeDtzw4H8ECCNCPBKkkSE/CpRRoR4N2ujQPwaMMWEeC9bYsB8HzrhwjwdvfPh/AgQTIjwRookRPwmSSZGeDNnkyD8FiilRngrV1KifBs20aE+Hbnr0PwOGGTGeCdPMmJ8Fy6xYz4ZtduyfA8ecOM+Fa27cz4NnXrznwzc//n8BAgsSvBChhQm/CJFFiV6M2OLEvwSJJUleitTSpF+GzLJkL0duefK/AoUVKV6J0sqUX4XKqlSvRm116l+Dxpo0r0VrbdqvQ2ddutejtz79vwGDDRneiNHGjN+EyaZMb8Zsc+bfgsWWLG/FamvWb8NmW7a3Y7c9+9+Bw44c78RpZ87vwmVXrnfjtjv378FjT5734rU37/fhsy/f+/Hbn3/AAACAoAAAAAAAAAOhIQAAAAAAnwAAAAAAgJ8A");
+        boolean selfTest = args.length == 1 && "--self-test".equals(args[0]);
+        byte[] expected = selfTest ? "AB".repeat(64).getBytes("US-ASCII") : Files.readAllBytes(Paths.get(args[0]));
+        byte[] compressed = selfTest ? modernUz : Files.readAllBytes(Paths.get(args[1]));
         check(Arrays.equals(expected, Ut99RedirectDownload.decodeUz(compressed, expected.length)), "UZ bytes differ");
         // Large real packages can be checked with -Xmx256m without also
         // retaining the HTTP fixture server's buffers and concurrent jobs.
@@ -38,7 +40,6 @@ public final class RedirectDownloadAudit {
             } catch (IOException correct) { }
         }
         // Synthetic AB repetition uses the extra RLE stage of UZ signature 5678.
-        byte[] modernUz = java.util.Base64.getDecoder().decode("LhYAAAlzYW1wbGUudQAcAAAA/wAABgR4IEADA34QIIMCPRiwwYF/CBBDgjwUqKFBPwyYYcEeDtzw4H8ECCNCPBKkkSE/CpRRoR4N2ujQPwaMMWEeC9bYsB8HzrhwjwdvfPh/AgQTIjwRookRPwmSSZGeDNnkyD8FiilRngrV1KifBs20aE+Hbnr0PwOGGTGeCdPMmJ8Fy6xYz4ZtduyfA8ecOM+Fa27cz4NnXrznwzc//n8BAgsSvBChhQm/CJFFiV6M2OLEvwSJJUleitTSpF+GzLJkL0duefK/AoUVKV6J0sqUX4XKqlSvRm116l+Dxpo0r0VrbdqvQ2ddutejtz79vwGDDRneiNHGjN+EyaZMb8Zsc+bfgsWWLG/FamvWb8NmW7a3Y7c9+9+Bw44c78RpZ87vwmVXrnfjtjv378FjT5734rU37/fhsy/f+/Hbn3/AAACAoAAAAAAAAAOhIQAAAAAAnwAAAAAAgJ8A");
         check(Arrays.equals("AB".repeat(64).getBytes("US-ASCII"),
                 Ut99RedirectDownload.decodeUz(modernUz, 128)), "UZ 5678 differs");
         Random random = new Random(469);

@@ -10,6 +10,36 @@
 #include "UnNet.h"
 
 #if defined(PLATFORM_ANDROID)
+void AInventory::execCompatShieldPickupQuery(FFrame& Stack, RESULT_DECL)
+{
+	guard(AInventory::execCompatShieldPickupQuery);
+	P_GET_OBJECT(AInventory,Item);
+	P_FINISH;
+	if(Item && Item->GetClass()==GetClass() && Owner)
+		for(AInventory* I=Owner->Inventory; I;)
+		{
+			AInventory* Next=I->Inventory;
+			if(I->bIsAnArmor && I!=this) GetLevel()->DestroyActor(I);
+			if(Next==I) break;
+			I=Next;
+		}
+	UClass* SuperClass=GetClass();
+	while(SuperClass && SuperClass->GetFName()!=FName(TEXT("UT_ShieldBelt")))
+		SuperClass=SuperClass->GetSuperClass();
+	check(SuperClass && SuperClass->GetSuperClass());
+	UFunction* SuperFunction=FindField<UFunction>(SuperClass->GetSuperClass(),TEXT("HandlePickupQuery"));
+	check(SuperFunction);
+	BYTE* Parms=(BYTE*)appAlloca(SuperFunction->ParmsSize);
+	appMemzero(Parms,SuperFunction->ParmsSize);
+	UObjectProperty* ItemProperty=FindField<UObjectProperty>(SuperFunction,TEXT("Item"));
+	UBoolProperty* Return=FindField<UBoolProperty>(SuperFunction,TEXT("ReturnValue"));
+	check(ItemProperty && Return);
+	*(AInventory**)(Parms+ItemProperty->Offset)=Item;
+	ProcessEvent(SuperFunction,Parms);
+	*(UBOOL*)Result=(*(BITFIELD*)(Parms+Return->Offset)&Return->BitMask)!=0;
+	unguard;
+}
+
 void AMutator::execRegisterHUDMutator(FFrame& Stack, RESULT_DECL)
 {
 	guard(AMutator::execRegisterHUDMutator);
@@ -51,6 +81,38 @@ void AMutator::execRegisterHUDMutator(FFrame& Stack, RESULT_DECL)
 	AActor object implementations.
 -----------------------------------------------------------------------------*/
 
+#if defined(PLATFORM_ANDROID)
+void AActor::StaticConstructor()
+{
+    BYTE Before[sizeof(AActor)];
+#define UT99_ACTOR_ALIAS(Member,Name,Type) UT99RegisterNativeFieldLayout(GetClass(),TEXT(#Name),TEXT(#Type),STRUCT_OFFSET(AActor,Member),sizeof(Member),0,UT99NativeFieldCapacity(Member));
+#define UT99_ACTOR_FIELD(Member,Type) UT99_ACTOR_ALIAS(Member,Member,Type)
+#define UT99_ACTOR_BOOL(Member) \
+    { \
+        UBOOL Previous=Member; \
+        appMemcpy(Before,this,sizeof(AActor)); \
+        Member=!Previous; \
+        INT Changed=0; DWORD Mask=0; \
+        for(INT Byte=sizeof(UObject);Byte<sizeof(AActor);++Byte) \
+            if(Before[Byte]!=((BYTE*)this)[Byte]) { Changed=Byte & ~3; Mask=(DWORD)(Before[Byte]^((BYTE*)this)[Byte])<<((Byte & 3)*8); break; } \
+        Member=Previous; \
+        check(Mask!=0); \
+        UT99RegisterNativeFieldLayout(GetClass(),TEXT(#Member),TEXT("BoolProperty"),Changed,sizeof(DWORD),Mask); \
+    }
+#include "UnActorNativeLayout.inc"
+#undef UT99_ACTOR_BOOL
+#undef UT99_ACTOR_FIELD
+#undef UT99_ACTOR_ALIAS
+}
+#endif
+
+#if defined(PLATFORM_ANDROID)
+#include "UnNativeLayoutMacros.h"
+#include "UnModernActorLayouts.inc"
+#undef UT99_LAYOUT_BOOL
+#undef UT99_LAYOUT_FIELD
+#endif
+
 IMPLEMENT_CLASS(AActor);
 IMPLEMENT_CLASS(ALight);
 IMPLEMENT_CLASS(AWeapon);
@@ -70,6 +132,10 @@ IMPLEMENT_CLASS(ATeleporter);
 IMPLEMENT_CLASS(APlayerStart);
 IMPLEMENT_CLASS(AKeypoint);
 IMPLEMENT_CLASS(AInventory);
+#if defined(PLATFORM_ANDROID)
+IMPLEMENT_CLASS(APickup);
+IMPLEMENT_CLASS(AAmmo);
+#endif
 IMPLEMENT_CLASS(AInventorySpot);
 IMPLEMENT_CLASS(ATriggers);
 IMPLEMENT_CLASS(ATrigger);
@@ -112,14 +178,35 @@ UBOOL NEQ(FPlane& A,FPlane& B,UPackageMap* Map) {return
 ((INT*)&A)[2]!=((INT*)&B)[2] || ((INT*)&A)[3]!=((INT*)&B)[3];}
 UBOOL NEQ(FString A,FString B,UPackageMap* Map) {return A!=B;}
 
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+static UProperty* AndroidReplicationProperty(UClass* Owner, const TCHAR* Name)
+{
+	// Resolve linked fields, including inherited properties, rather than relying
+	// on the object hash having an entry directly under this native class.
+	UProperty* Property = FindField<UProperty>(Owner, Name);
+	if (!Property || !(Property->PropertyFlags & CPF_Net) || Property->RepIndex == (_WORD)INDEX_NONE)
+	{
+		debugf(NAME_Warning, TEXT("Invalid native replication field %s.%s"), Owner->GetName(), Name);
+		for (TFieldIterator<UProperty> It(Owner); It; ++It)
+			debugf(NAME_Warning, TEXT("Replication field %s offset=%i index=%i flags=%08x"),
+				It->GetFullName(), It->Offset, It->RepIndex, It->PropertyFlags);
+		appErrorf(TEXT("Invalid native replication field %s.%s"), Owner->GetName(), Name);
+	}
+	return Property;
+}
+#define UT99_REPLICATION_PROPERTY(c,v) AndroidReplicationProperty(A##c::StaticClass(),TEXT(#v))
+#else
+#define UT99_REPLICATION_PROPERTY(c,v) FindObjectChecked<UProperty>(A##c::StaticClass(),TEXT(#v))
+#endif
+
 #define DOREP(c,v) \
 	if( NEQ(v,((A##c*)Recent)->v,Map) ) \
 	{ \
-		static UProperty* sp##v = FindObjectChecked<UProperty>(A##c::StaticClass(),TEXT(#v)); \
+		static UProperty* sp##v = UT99_REPLICATION_PROPERTY(c,v); \
 		*Ptr++ = sp##v->RepIndex; \
 	}
 #define DOREPARRAY(c,v) \
-	static UProperty* sp##v = FindObjectChecked<UProperty>(A##c::StaticClass(),TEXT(#v)); \
+	static UProperty* sp##v = UT99_REPLICATION_PROPERTY(c,v); \
 	for( INT i=0; i<ARRAY_COUNT(v); i++ ) \
 		if( NEQ(v[i],((A##c*)Recent)->v[i],Map) ) \
 			*Ptr++ = sp##v->RepIndex+i;
@@ -258,6 +345,35 @@ INT* AActor::GetOptimizedRepList( BYTE* Recent, FPropertyRetirement* Retire, INT
 	return Ptr;
 	unguard;
 }
+#if defined(PLATFORM_ANDROID)
+INT* APickup::GetOptimizedRepList(BYTE* Recent,FPropertyRetirement* Retire,INT* Ptr,UPackageMap* Map)
+{
+    Ptr=Super::GetOptimizedRepList(Recent,Retire,Ptr,Map);
+    if((StaticClass()->ClassFlags & CLASS_NativeReplication) && Role==ROLE_Authority && (bNetOwner || bNetViewingOwner))
+    { DOREP(Pickup,NumCopies); }
+    return Ptr;
+}
+INT* AAmmo::GetOptimizedRepList(BYTE* Recent,FPropertyRetirement* Retire,INT* Ptr,UPackageMap* Map)
+{
+    Ptr=Super::GetOptimizedRepList(Recent,Retire,Ptr,Map);
+    if((StaticClass()->ClassFlags & CLASS_NativeReplication) && Role==ROLE_Authority && (bNetOwner || bNetViewingOwner))
+    { DOREP(Ammo,AmmoAmount); }
+    return Ptr;
+}
+
+INT* AWeapon::GetOptimizedRepList(BYTE* Recent,FPropertyRetirement* Retire,INT* Ptr,UPackageMap* Map)
+{
+    Ptr=Super::GetOptimizedRepList(Recent,Retire,Ptr,Map);
+    if((StaticClass()->ClassFlags & CLASS_NativeReplication) && Role==ROLE_Authority && (bNetOwner || bNetViewingOwner))
+    {
+        DOREP(Weapon,AmmoType);
+        DOREP(Weapon,bLockedOn);
+        DOREP(Weapon,bHideWeapon);
+    }
+    return Ptr;
+}
+#endif
+
 INT* APawn::GetOptimizedRepList( BYTE* Recent, FPropertyRetirement* Retire, INT* Ptr, UPackageMap* Map )
 {
 	guard(APawn::GetOptimizedRepList);
@@ -869,6 +985,30 @@ UBOOL AActor::IsOverlapping( const AActor* Other ) const
 	Actor touch minions.
 -----------------------------------------------------------------------------*/
 
+UBOOL AActor::UsesModernTouching() const
+{
+#if defined(PLATFORM_ANDROID)
+    static const UBOOL Modern=Cast<UArrayProperty>(FindField<UProperty>(AActor::StaticClass(),TEXT("Touching")))!=NULL;
+    return Modern;
+#else
+    return 0;
+#endif
+}
+INT AActor::TouchCount() const
+{
+#if defined(PLATFORM_ANDROID)
+    if(UsesModernTouching()) return ModernTouching.Num();
+#endif
+    return ARRAY_COUNT(Touching);
+}
+AActor*& AActor::TouchAt(INT Index)
+{
+#if defined(PLATFORM_ANDROID)
+    if(UsesModernTouching()) return ModernTouching(Index);
+#endif
+    return Touching[Index];
+}
+
 static UBOOL TouchTo( AActor* Actor, AActor* Other )
 {
 	guard(TouchTo);
@@ -877,49 +1017,52 @@ static UBOOL TouchTo( AActor* Actor, AActor* Other )
 	check(Actor!=Other);
 
 	INT Available=-1;
-	for( INT i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
+	for( INT i=0; i<Actor->TouchCount(); i++ )
 	{
-		if( Actor->Touching[i] == NULL )
+		if( Actor->TouchAt(i) == NULL )
 		{
 			// Found an available slot.
 			Available = i;
 		}
-		else if( Actor->Touching[i] == Other )
+		else if( Actor->TouchAt(i) == Other )
 		{
 			// Already touching.
 			return 1;
 		}
 	}
+#if defined(PLATFORM_ANDROID)
+    if(Available==-1 && Actor->UsesModernTouching()) Available=Actor->ModernTouching.AddItem(NULL);
+#endif
 	if( Available == -1 )
 	{
 		// Try to prune touches.
-		for( INT i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
+		for( INT i=0; i<Actor->TouchCount(); i++ )
 		{
-			check(Actor->Touching[i]->IsValid());
-			if( Actor->Touching[i]->Physics == PHYS_None )
+			check(Actor->TouchAt(i)->IsValid());
+			if( Actor->TouchAt(i)->Physics == PHYS_None )
 			{
-				Actor->EndTouch( Actor->Touching[i], 0 );
+				Actor->EndTouch( Actor->TouchAt(i), 0 );
 				Available = i;
 			}
 		}
 		if ( (Available == -1) && Other->IsA(APawn::StaticClass()) )
 		{
 			// try to prune in favor of 1. players, 2. other pawns
-			for( INT i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
+			for( INT i=0; i<Actor->TouchCount(); i++ )
 			{
-				if( !Actor->Touching[i]->IsA(APawn::StaticClass()) )
+				if( !Actor->TouchAt(i)->IsA(APawn::StaticClass()) )
 				{
-					Actor->EndTouch( Actor->Touching[i], 0 );
+					Actor->EndTouch( Actor->TouchAt(i), 0 );
 					Available = i;
 					break;
 				}
 			}
 			if ( (Available == -1) && ((APawn *)Other)->bIsPlayer )
-				for( INT i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
+				for( INT i=0; i<Actor->TouchCount(); i++ )
 				{
-					if( !Actor->Touching[i]->IsA(APawn::StaticClass()) || !((APawn *)Actor->Touching[i])->bIsPlayer )
+					if( !Actor->TouchAt(i)->IsA(APawn::StaticClass()) || !((APawn *)Actor->TouchAt(i))->bIsPlayer )
 					{
-						Actor->EndTouch( Actor->Touching[i], 0 );
+						Actor->EndTouch( Actor->TouchAt(i), 0 );
 						Available = i;
 						break;
 					}
@@ -930,11 +1073,11 @@ static UBOOL TouchTo( AActor* Actor, AActor* Other )
 	if( Available >= 0 )
 	{
 		// Make Actor touch TouchActor.
-		Actor->Touching[Available] = Other;
+		Actor->TouchAt(Available) = Other;
 		Actor->eventTouch( Other );
 
 		// See if first actor did something that caused an UnTouch.
-		if( Actor->Touching[Available] != Other )
+		if( Actor->TouchAt(Available) != Other )
 			return 0;
 	}
 
@@ -975,11 +1118,11 @@ void AActor::EndTouch( AActor* Other, UBOOL NoNotifySelf )
 	check(Other!=this);
 
 	// Notify Actor.
-	for( int i=0; i<ARRAY_COUNT(Touching); i++ )
+	for( int i=0; i<TouchCount(); i++ )
 	{
-		if( Touching[i] == Other )
+		if( TouchAt(i) == Other )
 		{
-			Touching[i] = NULL;
+			TouchAt(i) = NULL;
 			if( !NoNotifySelf )
 				eventUnTouch( Other );
 			break;
@@ -987,11 +1130,11 @@ void AActor::EndTouch( AActor* Other, UBOOL NoNotifySelf )
 	}
 
 	// Notify TouchActor.
-	for( INT i=0; i<ARRAY_COUNT(Other->Touching); i++ )
+	for( INT i=0; i<Other->TouchCount(); i++ )
 	{
-		if( Other->Touching[i] == this )
+		if( Other->TouchAt(i) == this )
 		{
-			Other->Touching[i] = NULL;
+			Other->TouchAt(i) = NULL;
 			Other->eventUnTouch( this );
 			break;
 		}

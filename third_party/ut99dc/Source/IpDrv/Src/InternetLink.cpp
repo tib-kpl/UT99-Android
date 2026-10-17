@@ -19,6 +19,25 @@ Revision history:
 	AInternetLink implementation.
 -----------------------------------------------------------------------------*/
 
+#if defined(PLATFORM_ANDROID)
+void AInternetLink::StaticConstructor()
+{
+#define REGISTER_LINK(Member,Type) UT99RegisterNativeFieldLayout(GetClass(),TEXT(#Member),TEXT(#Type),STRUCT_OFFSET(AInternetLink,Member),sizeof(Member));
+    REGISTER_LINK(LinkMode,ByteProperty)
+    REGISTER_LINK(Socket,IntProperty)
+    REGISTER_LINK(Socket,PointerProperty)
+    REGISTER_LINK(Port,IntProperty)
+    REGISTER_LINK(RemoteSocket,IntProperty)
+    REGISTER_LINK(RemoteSocket,PointerProperty)
+    REGISTER_LINK(PrivateResolveInfo,IntProperty)
+    REGISTER_LINK(PrivateResolveInfo,PointerProperty)
+    REGISTER_LINK(DataPending,IntProperty)
+    REGISTER_LINK(ReceiveMode,ByteProperty)
+    REGISTER_LINK(TextEncoding,ByteProperty)
+#undef REGISTER_LINK
+}
+#endif
+
 IMPLEMENT_CLASS(AInternetLink);
 
 //

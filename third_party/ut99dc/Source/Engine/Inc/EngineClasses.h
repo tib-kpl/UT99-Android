@@ -872,6 +872,21 @@ public:
     BITFIELD bClientDemoNetFunc:1;
     class UClass* RenderIteratorClass GCC_PACK(4);
     class URenderIterator* RenderInterface;
+#if defined(PLATFORM_ANDROID)
+    // Additional 469 fields have explicit native layout descriptors. Existing
+    // v400 members retain their representation, including the fixed touch list.
+    FLOAT SpriteProjForward;
+    BITFIELD bFilterByVolume:1 GCC_PACK(4);
+    BITFIELD bScriptInitialized:1;
+    BITFIELD bNetViewingOwner:1;
+    class UAnimation* SkelAnim;
+    class AActor* HitActor;
+    BYTE TransientSoundPriority;
+    BYTE SoundPriority;
+    INT Unused;
+    TArray<class AActor*> ModernTouching;
+    void StaticConstructor();
+#endif
     DECLARE_FUNCTION(execMultiply_ColorFloat);
     DECLARE_FUNCTION(execAdd_ColorColor);
     DECLARE_FUNCTION(execMultiply_FloatColor);
@@ -884,6 +899,11 @@ public:
     DECLARE_FUNCTION(execBasedActors);
     DECLARE_FUNCTION(execChildActors);
     DECLARE_FUNCTION(execAllActors);
+    #if defined(PLATFORM_ANDROID)
+    DECLARE_FUNCTION(execLinkSkelAnim);
+    DECLARE_FUNCTION(execGetCacheEntry);
+    DECLARE_FUNCTION(execMoveCacheEntry);
+    #endif
     DECLARE_FUNCTION(execGetNextIntDesc);
     DECLARE_FUNCTION(execGetNextInt);
     DECLARE_FUNCTION(execGetURLMap);
@@ -1564,6 +1584,15 @@ public:
     {
         ProcessEvent(FindFunctionChecked(ENGINE_MayFall),NULL);
     }
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bPawnLink:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
+#if defined(PLATFORM_ANDROID)
+    DECLARE_FUNCTION(execCheckValidSkinPackage);
+    DECLARE_FUNCTION(execGetNextViewTarget);
+#endif
     DECLARE_CLASS(APawn,AActor,0|CLASS_Config|CLASS_NativeReplication)
     #include "APawn.h"
 };
@@ -1702,7 +1731,7 @@ public:
     class UClass* SpecialMenu;
     FStringNoInit DelayedCommand;
     FLOAT MouseSensitivity;
-    FName WeaponPriority[20];
+    FName WeaponPriority[50];
     FLOAT SmoothMouseX;
     FLOAT SmoothMouseY;
     FLOAT BorrowedMouseX;
@@ -1820,6 +1849,48 @@ public:
     }
 #if defined(PLATFORM_ANDROID)
     FLOAT LastMessageWindow;
+#endif
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD ReceivedSecretChecksum:1 GCC_PACK(4);
+    BITFIELD bCyclingView:1 GCC_PACK(4);
+    FLOAT ViewDelay;
+    FLOAT LastView;
+    INT LoginAttempts;
+    INT MaxNameChanges;
+    FLOAT MinFOV;
+    FLOAT MaxFOV;
+    INT NameChanges;
+    FLOAT SpeechDelay;
+    FLOAT LastTaunt;
+    FLOAT TauntDelay;
+    FLOAT NextLoginTime;
+    BITFIELD bLoginDisabled:1 GCC_PACK(4);
+    FLOAT LastSpeech;
+    BITFIELD bNoMouseSmoothing:1 GCC_PACK(4);
+    FVector AdjustLocationOffset;
+    FLOAT AdjustLocationAlpha;
+    FLOAT LastClientTimestamp;
+    FVector LastClientLocation;
+    FVector PreAdjustLocation;
+    BITFIELD bDisableMovementBuffering:1 GCC_PACK(4);
+    FLOAT AccumulatedVTurn;
+    BITFIELD bPausePressed:1 GCC_PACK(4);
+    FLOAT AccumulatedHTurn;
+    INT ClientMovementVersion;
+    INT ServerMovementVersion;
+    INT StoredCanvasY;
+    INT StoredCanvasX;
+    FLOAT DesiredNarrowFOV;
+    BYTE FOVFix;
+    FLOAT WeaponFOVScale;
+    FLOAT CheatFlyingSpeed;
+    BITFIELD bLegacyVolumeBoost:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
+#if defined(PLATFORM_ANDROID)
+    DECLARE_FUNCTION(execStartTextInput);
+    DECLARE_FUNCTION(execStopTextInput);
 #endif
     DECLARE_CLASS(APlayerPawn,APawn,0|CLASS_Config|CLASS_NativeReplication)
     #include "APlayerPawn.h"
@@ -1949,6 +2020,11 @@ public:
     FVector RealPosition;
     FRotator RealRotation;
     INT ClientUpdate;
+
+#if defined(PLATFORM_ANDROID)
+    FRotator oldRot;
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(AMover,ABrush,0|CLASS_NativeReplication)
     #include "AMover.h"
 };
@@ -1989,6 +2065,8 @@ public:
     TArray<INT> SurfList;
     DECLARE_FUNCTION(execDetachDecal);
     DECLARE_FUNCTION(execAttachDecal);
+    DECLARE_FUNCTION(execAttachToSurface);
+    DECLARE_FUNCTION(execCompatPockAttachToSurface);
     void eventUpdate(class AActor* L)
     {
         ADecal_eventUpdate_Parms Parms;
@@ -2173,6 +2251,12 @@ public:
         Parms.SpecialParam=SpecialParam;
         ProcessEvent(FindFunctionChecked(ENGINE_LogGameSpecial),&Parms);
     }
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bWorldBatcherError:1 GCC_PACK(4);
+    BITFIELD bLogTypingEvents:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(AStatLog,AInfo,0|CLASS_Config)
     NO_DEFAULT_CONSTRUCTOR(AStatLog)
 };
@@ -2191,6 +2275,11 @@ public:
     DECLARE_FUNCTION(execWatermark);
     DECLARE_FUNCTION(execCloseLog);
     DECLARE_FUNCTION(execOpenLog);
+
+#if defined(PLATFORM_ANDROID)
+    BYTE Encoding;
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(AStatLogFile,AStatLog,0|CLASS_Config)
     NO_DEFAULT_CONSTRUCTOR(AStatLogFile)
 };
@@ -2218,6 +2307,14 @@ public:
     BITFIELD bForceFire:1;
     BITFIELD bForceAltFire:1;
     BYTE DodgeMove GCC_ALIGN(4);
+
+#if defined(PLATFORM_ANDROID)
+    FVector SavedLocation;
+    FVector SavedVelocity;
+    FRotator SavedViewRotation;
+    BYTE MergeCount;
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(ASavedMove,AInfo,0)
     NO_DEFAULT_CONSTRUCTOR(ASavedMove)
 };
@@ -2435,6 +2532,16 @@ public:
         Parms.bItems=bItems;
         ProcessEvent(FindFunctionChecked(ENGINE_ServerTravel),&Parms);
     }
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bLowRes:1 GCC_PACK(4);
+    FString VisibleGroups;
+    INT ServerMoveVersion;
+    FString EngineRevision;
+    FString EngineArchitecture;
+    BITFIELD bNextURLAbsolute:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(ALevelInfo,AZoneInfo,0)
     NO_DEFAULT_CONSTRUCTOR(ALevelInfo)
 };
@@ -2542,7 +2649,7 @@ public:
     INT MaxPlayers;
     INT NumPlayers;
     INT CurrentID;
-    FStringNoInit IPPolicies[50];
+    FStringNoInit IPPolicies[255];
     class UClass* DeathMessageClass;
     class UClass* DMMessageClass;
     class UClass* MutatorClass;
@@ -2566,6 +2673,9 @@ public:
     INT DemoHasTuts;
     DECLARE_FUNCTION(execParseKillMessage);
     DECLARE_FUNCTION(execGetNetworkNumber);
+#if defined(PLATFORM_ANDROID)
+    DECLARE_FUNCTION(execGetMutatorList);
+#endif
     void eventAcceptInventory(class APawn* PlayerPawn)
     {
         AGameInfo_eventAcceptInventory_Parms Parms;
@@ -2623,6 +2733,26 @@ public:
     {
         ProcessEvent(FindFunctionChecked(ENGINE_GameEnding),NULL);
     }
+
+#if defined(PLATFORM_ANDROID)
+    class AMutator* MessageMutator;
+    BITFIELD bExternalBatcher:1 GCC_PACK(4);
+    FString EnabledMutators;
+    BITFIELD bLogAdminActions:1 GCC_PACK(4);
+    FLOAT MinFOV;
+    FLOAT MaxFOV;
+    BYTE ActionToTake;
+    INT MaxLoginAttempts;
+    FLOAT PlayerViewDelay;
+    FLOAT PlayerSpeechDelay;
+    FLOAT PlayerTauntDelay;
+    INT MaxNameChanges;
+    FLOAT LoginDelaySeconds;
+    INT NoLockdown;
+    BITFIELD bFixFeignDeathZoomBug:1 GCC_PACK(4);
+    BITFIELD bFixMultiWeaponBug:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(AGameInfo,AInfo,0|CLASS_Config)
     NO_DEFAULT_CONSTRUCTOR(AGameInfo)
 };
@@ -2651,6 +2781,11 @@ public:
         Parms.Canvas=Canvas;
         ProcessEvent(FindFunctionChecked(ENGINE_PostRender),&Parms);
     }
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bAddToPackageMap:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(AMutator,AInfo,0)
     NO_DEFAULT_CONSTRUCTOR(AMutator)
 };
@@ -2710,6 +2845,12 @@ public:
         ProcessEvent(FindFunctionChecked(ENGINE_SpecialCost),&Parms);
         return Parms.ReturnValue;
     }
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bAutoBuilt:1 GCC_PACK(4);
+    BITFIELD bTwoWay:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(ANavigationPoint,AActor,0)
     NO_DEFAULT_CONSTRUCTOR(ANavigationPoint)
 };
@@ -2949,6 +3090,11 @@ public:
     FLOAT DamageThreshold;
     class AActor* TriggerActor;
     class AActor* TriggerActor2;
+
+#if defined(PLATFORM_ANDROID)
+    FVector HitLocation;
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(ATrigger,ATriggers,0)
     NO_DEFAULT_CONSTRUCTOR(ATrigger)
 };
@@ -2962,6 +3108,7 @@ struct AInventory_eventBotDesireability_Parms
 class ENGINE_API AInventory : public AActor
 {
 public:
+    DECLARE_FUNCTION(execCompatShieldPickupQuery);
     BYTE AutoSwitchPriority;
     BYTE InventoryGroup;
     BITFIELD bActivatable:1 GCC_PACK(4);
@@ -3025,10 +3172,47 @@ public:
         ProcessEvent(FindFunctionChecked(ENGINE_BotDesireability),&Parms);
         return Parms.ReturnValue;
     }
+
+#if defined(PLATFORM_ANDROID)
+    BITFIELD bCalcDrawOffsetFOV:1 GCC_PACK(4);
+    BITFIELD bDefaultInventory:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
     DECLARE_CLASS(AInventory,AActor,0|CLASS_NativeReplication)
     #include "AInventory.h"
 };
 
+
+#if defined(PLATFORM_ANDROID)
+// These script classes gained native replication in later package versions.
+// Keep their script fields explicit so both package generations share storage.
+class ENGINE_API APickup : public AInventory
+{
+public:
+    AInventory* Inv;
+    INT NumCopies;
+    BITFIELD bCanHaveMultipleCopies:1 GCC_PACK(4);
+    BITFIELD bCanActivate:1;
+    FStringNoInit ExpireMessage;
+    BITFIELD bAutoActivate:1 GCC_PACK(4);
+    void StaticConstructor();
+    INT* GetOptimizedRepList(BYTE*,FPropertyRetirement*,INT*,UPackageMap*);
+    DECLARE_CLASS(APickup,AInventory,0)
+};
+
+class ENGINE_API AAmmo : public APickup
+{
+public:
+    INT AmmoAmount;
+    INT MaxAmmo;
+    UClass* ParentAmmo;
+    BYTE UsedInWeaponSlot[10];
+    AAmmo* PAmmo;
+    void StaticConstructor();
+    INT* GetOptimizedRepList(BYTE*,FPropertyRetirement*,INT*,UPackageMap*);
+    DECLARE_CLASS(AAmmo,APickup,0)
+};
+#endif
 
 class ENGINE_API AWeapon : public AInventory
 {
@@ -3095,6 +3279,7 @@ public:
     class UTexture* MFTexture;
     class UTexture* MuzzleFlare;
     FLOAT FlareOffset;
+    INT* GetOptimizedRepList(BYTE*,FPropertyRetirement*,INT*,UPackageMap*);
     DECLARE_CLASS(AWeapon,AInventory,0)
     NO_DEFAULT_CONSTRUCTOR(AWeapon)
 };
@@ -3187,6 +3372,11 @@ AUTOGENERATE_FUNCTION(AActor,307,execTouchingActors);
 AUTOGENERATE_FUNCTION(AActor,306,execBasedActors);
 AUTOGENERATE_FUNCTION(AActor,305,execChildActors);
 AUTOGENERATE_FUNCTION(AActor,304,execAllActors);
+#if defined(PLATFORM_ANDROID)
+AUTOGENERATE_FUNCTION(AActor,-1,execLinkSkelAnim);
+AUTOGENERATE_FUNCTION(AActor,-1,execGetCacheEntry);
+AUTOGENERATE_FUNCTION(AActor,-1,execMoveCacheEntry);
+#endif
 AUTOGENERATE_FUNCTION(AActor,-1,execGetNextIntDesc);
 AUTOGENERATE_FUNCTION(AActor,-1,execGetNextInt);
 AUTOGENERATE_FUNCTION(AActor,547,execGetURLMap);
@@ -3226,6 +3416,9 @@ AUTOGENERATE_FUNCTION(AActor,233,execError);
 AUTOGENERATE_FUNCTION(AActor,-1,execConsoleCommand);
 AUTOGENERATE_FUNCTION(ADecal,-1,execDetachDecal);
 AUTOGENERATE_FUNCTION(ADecal,-1,execAttachDecal);
+AUTOGENERATE_FUNCTION(ADecal,-1,execAttachToSurface);
+AUTOGENERATE_FUNCTION(ADecal,-1,execCompatPockAttachToSurface);
+AUTOGENERATE_FUNCTION(AInventory,-1,execCompatShieldPickupQuery);
 AUTOGENERATE_FUNCTION(AStatLogFile,-1,execFileLog);
 AUTOGENERATE_FUNCTION(AStatLogFile,-1,execFileFlush);
 AUTOGENERATE_FUNCTION(AStatLogFile,-1,execGetChecksum);
@@ -3251,6 +3444,15 @@ AUTOGENERATE_FUNCTION(AWarpZoneInfo,314,execWarp);
 AUTOGENERATE_FUNCTION(AZoneInfo,308,execZoneActors);
 AUTOGENERATE_FUNCTION(AGameInfo,-1,execParseKillMessage);
 AUTOGENERATE_FUNCTION(AGameInfo,-1,execGetNetworkNumber);
+#if defined(PLATFORM_ANDROID)
+AUTOGENERATE_FUNCTION(AGameInfo,-1,execGetMutatorList);
+AUTOGENERATE_FUNCTION(APlayerPawn,-1,execStartTextInput);
+AUTOGENERATE_FUNCTION(APlayerPawn,-1,execStopTextInput);
+AUTOGENERATE_FUNCTION(UCanvas,-1,execCreateFont);
+AUTOGENERATE_FUNCTION(UCanvas,-1,execGetDesktopDPI);
+AUTOGENERATE_FUNCTION(APawn,-1,execCheckValidSkinPackage);
+AUTOGENERATE_FUNCTION(APawn,-1,execGetNextViewTarget);
+#endif
 AUTOGENERATE_FUNCTION(ALevelInfo,-1,execGetAddressURL);
 AUTOGENERATE_FUNCTION(ALevelInfo,-1,execGetLocalURL);
 

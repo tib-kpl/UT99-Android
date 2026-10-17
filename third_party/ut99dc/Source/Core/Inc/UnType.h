@@ -425,6 +425,7 @@ class CORE_API UArrayProperty : public UProperty
 
 	// Variables.
 	UProperty* Inner;
+	INT StaticArrayDim;
 
 	// Constructors.
 	UArrayProperty()
@@ -435,6 +436,7 @@ class CORE_API UArrayProperty : public UProperty
 
 	// UObject interface.
 	void Serialize( FArchive& Ar );
+	void StaticConstructor();
 
 	// UProperty interface.
 	void Link( FArchive& Ar, UProperty* Prev );

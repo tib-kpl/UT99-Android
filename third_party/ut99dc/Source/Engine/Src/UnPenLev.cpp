@@ -300,6 +300,23 @@ void UNetPendingLevel::NotifyReceivedFile( UNetConnection* Connection, INT Packa
 	}
 	else
 	{
+#if defined(PLATFORM_ANDROID)
+        // Both HTTP and file-channel completion pass here. Preserve the server's
+        // original basename for the script cache manager, never a supplied path.
+        if(RedirectNames.IsValidIndex(PackageIndex))
+        {
+            FString Name=RedirectNames(PackageIndex);
+            UBOOL Safe=Name.Len()>0 && Name.Len()<256 && Name.InStr(TEXT(".."))==INDEX_NONE;
+            for(INT c=0;c<Name.Len();++c)
+                if((*Name)[c]=='/' || (*Name)[c]=='\\' || (*Name)[c]==':' || (*Name)[c]<32) Safe=0;
+            if(Safe)
+            {
+                FString Ini=GSys->CachePath * TEXT("cache.ini");
+                GConfig->SetString(TEXT("Cache"),Info.Guid.String(),*Name,*Ini);
+                GConfig->Flush(0,*Ini);
+            }
+        }
+#endif
 		// Now that a file has been successfully received, mark its package as downloaded.
 		check(Connection==NetDriver->ServerConnection);
 		check(Info.PackageFlags&PKG_Need);

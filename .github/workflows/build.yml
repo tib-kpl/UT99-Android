@@ -33,6 +33,17 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "ndk;23.2.8568313" "cmake;3.22.1" > /dev/null
           echo "sdk.dir=$ANDROID_HOME" > local.properties
 
+      - name: Check package policy and HTTP downloads
+        run: |
+          mkdir -p build/java-policy
+          javac -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d build/java-policy \
+            app/src/main/java/com/ast/ut99/UT99Paths.java \
+            app/src/main/java/com/ast/ut99/Ut99RedirectDownload.java \
+            tools/java_tests/SystemPackageAudit.java \
+            tools/java_tests/RedirectDownloadAudit.java
+          java -cp "build/java-policy:$ANDROID_HOME/platforms/android-35/android.jar" com.ast.ut99.SystemPackageAudit build/package-policy-tests
+          java -cp build/java-policy com.ast.ut99.RedirectDownloadAudit --self-test
+
       - name: Build both menus
         run: |
           chmod +x gradlew
@@ -93,7 +104,7 @@ jobs:
           printf '%s\n\n%s\n\n%s\n\nCommit: %s/%s/commit/%s\nBuild: %s/%s/actions/runs/%s\n' \
             'Deux APK signés : classic-menu pour le menu UT99 classique ; console-menu pour le menu console / téléphone.' \
             'Même moteur Android natif, mêmes correctifs et mêmes données dans les deux variantes. Installer une variante remplace l’autre en conservant les données.' \
-            'Données du jeu non incluses. La compatibilité OldUnreal reste partielle : les packages système compatibles v400 sont encore nécessaires. Voir docs/GOTY_COMPATIBILITY.md.' \
+            'Données du jeu non incluses. Les installations complètes v400 et GOTY/OldUnreal 469f sont prises en charge ; certaines extensions du moteur et certains mods restent à adapter. Voir docs/GOTY_COMPATIBILITY.md.' \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/notes.md"
           gh release create "$tag" dist/*-classic-menu-release.apk dist/*-console-menu-release.apk \

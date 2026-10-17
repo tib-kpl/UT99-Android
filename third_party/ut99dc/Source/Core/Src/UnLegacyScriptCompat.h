@@ -6,7 +6,7 @@
 #if defined(PLATFORM_ANDROID)
 namespace LegacyScriptCompat
 {
-enum EType { Object, Class, Bool, Byte, Int, Float, Name, String, Vector };
+enum EType { Object, Class, Bool, Byte, Int, Float, Name, String, Vector, Rotator, Pointer, IntArray };
 struct FParam { const TCHAR* Name; EType Type; const TCHAR* ClassName; DWORD Flags; };
 
 static UProperty* Property(UStruct* Owner, const FParam& Param)
@@ -30,16 +30,24 @@ static UProperty* Property(UStruct* Owner, const FParam& Param)
 		}
 		break;
 	}
+    case IntArray:
+    {
+        UArrayProperty* Array=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UArrayProperty;
+        Array->Inner=new(Array,TEXT("Inner"),RF_Public|RF_Native|RF_Transient)UIntProperty;
+        P=Array;
+        break;
+    }
+	case Pointer: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UPointerProperty; break;
 	case Bool: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UBoolProperty; break;
 	case Byte: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UByteProperty; break;
 	case Int: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UIntProperty; break;
 	case Float: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UFloatProperty; break;
 	case Name: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UNameProperty; break;
 	case String: P=new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UStrProperty; break;
-	case Vector:
+	case Vector: case Rotator:
 	{
 		UStructProperty* S = new(Owner,Param.Name,RF_Public|RF_Native|RF_Transient)UStructProperty;
-		S->Struct=FindObject<UStruct>(ANY_PACKAGE,TEXT("Vector")); check(S->Struct); P=S;
+		S->Struct=FindObject<UStruct>(ANY_PACKAGE,Param.Type==Rotator ? TEXT("Rotator") : TEXT("Vector")); check(S->Struct); P=S;
 		break;
 	}
 	}
@@ -107,10 +115,40 @@ static void Function(UStruct* Owner, FArchive& Ar, UField**& Tail,
 	F->Bind(); *Tail=F; Tail=&F->Next;
 }
 
+static void ModernActorFields(UStruct* Owner,FArchive& Ar,UField**& Tail)
+{
+#include "UnModernActorFields.inc"
+}
+
 static void Extend(UStruct* Owner, FArchive& Ar, UBOOL Props)
 {
 	if(!Props || !Ar.IsLoading() || Ar.Ver()!=68 || !Owner->GetOuter()
 	) return;
+	if(Owner->GetOuter()->GetFName()==FName(TEXT("Botpack"))
+	&& Owner->GetFName()==FName(TEXT("UT_ShieldBelt")))
+	{
+		UField** Tail=&Owner->Children;
+		while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+		FParam Item[]={{TEXT("Item"),Object,TEXT("Inventory"),CPF_Parm}};
+		Function(Owner,Ar,Tail,TEXT("HandlePickupQuery"),NULL,0,Item,1,FUNC_Native);
+		return;
+	}
+	if(Owner->GetOuter()->GetFName()==FName(TEXT("Botpack")))
+	{
+		const TCHAR* Type=Owner->GetName();
+		UBOOL Pock=!appStricmp(Type,TEXT("Pock"));
+		UBOOL Manual=!appStricmp(Type,TEXT("DirectionalBlast")) || !appStricmp(Type,TEXT("FadeShadow"))
+			|| !appStricmp(Type,TEXT("PlayerShadow")) || !appStricmp(Type,TEXT("TargetShadow"));
+		if(Pock || Manual)
+		{
+			UField** Tail=&Owner->Children;
+			while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+			// These four shadow/directional overrides deliberately attach later.
+			Function(Owner,Ar,Tail,TEXT("AttachToSurface"),NULL,-1,NULL,0,
+				Pock ? FUNC_Native|FUNC_Simulated : FUNC_Defined);
+			return;
+		}
+	}
 	// Later scripts test SetPropertyText's boolean result. The v400 native
 	// function has the same inputs but no return property. Add only that
 	// result slot; callers compiled against the old void API still ignore it.
@@ -155,6 +193,12 @@ static void Extend(UStruct* Owner, FArchive& Ar, UBOOL Props)
         Function(Owner,Ar,Tail,TEXT("IsUTracing"),NULL,0,NULL,0,StaticNative);
         return;
     }
+    if(Owner->IsA(UClass::StaticClass()) && Owner->GetOuter()->GetFName()==NAME_Engine)
+    {
+        UField** Tail=&Owner->Children;
+        while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+        ModernActorFields(Owner,Ar,Tail);
+    }
 	if(!appStricmp(Owner->GetOuter()->GetName(),TEXT("Botpack"))
 	&& !appStricmp(Owner->GetName(),TEXT("ChallengeHUD")))
 	{
@@ -172,14 +216,79 @@ static void Extend(UStruct* Owner, FArchive& Ar, UBOOL Props)
 		}
 		return;
 	}
+    if(Owner->GetOuter()->GetFName()==NAME_Engine && Owner->GetFName()==FName(TEXT("RenderIterator")))
+    {
+        UField** Tail=&Owner->Children;
+        while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+        if(!FindObject<UProperty>(Owner,TEXT("Frame")))
+        {
+            FParam P={TEXT("Frame"),Object,TEXT("Actor"),CPF_Transient};
+            *Tail=Property(Owner,P);
+        }
+        return;
+    }
+    if(Owner->GetOuter()->GetFName()==NAME_Engine && (Owner->GetFName()==FName(TEXT("Canvas")) || Owner->GetFName()==FName(TEXT("Console"))))
+    {
+        UField** Tail=&Owner->Children;
+        while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+        FParam Canvas[]={{TEXT("UglyFontScaling"),Int,NULL,CPF_Const},
+            {TEXT("DynamicFontUnicodeRange"),String,NULL,CPF_Config},
+            {TEXT("bSnapToPixels"),Bool,NULL,0}};
+        FParam Console[]={{TEXT("bControlDown"),Bool,NULL,0},{TEXT("TypeCursorOffset"),Int,NULL,0}};
+        UBOOL IsCanvas=Owner->GetFName()==FName(TEXT("Canvas"));
+        FParam* Additional=IsCanvas ? Canvas : Console;
+        INT Count=IsCanvas ? ARRAY_COUNT(Canvas) : ARRAY_COUNT(Console);
+        for(INT Index=0;Index<Count;++Index)
+            if(!FindObject<UProperty>(Owner,Additional[Index].Name))
+            { *Tail=Property(Owner,Additional[Index]); Tail=&(*Tail)->Next; }
+        return;
+    }
+    if(Owner->GetOuter()->GetFName()==NAME_Engine && Owner->GetFName()==FName(TEXT("ScriptedTexture")))
+    {
+        UField** Tail=&Owner->Children;
+        while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+        FParam Additional[]={{TEXT("Junk4"),IntArray,NULL,CPF_Transient|CPF_Const},
+            {TEXT("Junk5"),IntArray,NULL,CPF_Transient|CPF_Const}};
+        for(INT Index=0;Index<ARRAY_COUNT(Additional);++Index)
+            if(!FindObject<UProperty>(Owner,Additional[Index].Name))
+            { *Tail=Property(Owner,Additional[Index]); Tail=&(*Tail)->Next; }
+        return;
+    }
+    if(Owner->GetOuter()->GetFName()==NAME_Engine && Owner->GetFName()==FName(TEXT("Texture")))
+    {
+        UField** Tail=&Owner->Children;
+        while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+        FParam Additional[]={{TEXT("SourceMip"),Pointer,NULL,CPF_Native},
+            {TEXT("TextureHandle"),Pointer,NULL,CPF_Native},
+            {TEXT("RealtimeChangeCount"),Int,NULL,CPF_Transient}};
+        for(INT Index=0;Index<ARRAY_COUNT(Additional);++Index)
+            if(!FindObject<UProperty>(Owner,Additional[Index].Name))
+            { *Tail=Property(Owner,Additional[Index]); Tail=&(*Tail)->Next; }
+        return;
+    }
 	if(appStricmp(Owner->GetOuter()->GetName(),TEXT("Engine"))) return;
 	const TCHAR* Type=Owner->GetName();
 	if(appStricmp(Type,TEXT("Mutator")) && appStricmp(Type,TEXT("Actor"))
-	&& appStricmp(Type,TEXT("HUD")) && appStricmp(Type,TEXT("PlayerPawn"))) return;
+	&& appStricmp(Type,TEXT("HUD")) && appStricmp(Type,TEXT("PlayerPawn"))
+	&& appStricmp(Type,TEXT("Decal"))) return;
 	UField** Tail=&Owner->Children;
 	while(*Tail) { Ar.Preload(*Tail); Tail=&(*Tail)->Next; }
+	if(!appStricmp(Type,TEXT("Decal")))
+	{
+		Function(Owner,Ar,Tail,TEXT("AttachToSurface"),NULL,-1,NULL,0,FUNC_Native|FUNC_Simulated);
+		return;
+	}
 	if(!appStricmp(Type,TEXT("Actor")))
 	{
+        FParam Additional[]={{TEXT("SpriteProjForward"),Float,NULL,0},
+            {TEXT("bFilterByVolume"),Bool,NULL,0},{TEXT("bScriptInitialized"),Bool,NULL,0},
+            {TEXT("bNetViewingOwner"),Bool,NULL,CPF_Const},
+            {TEXT("SkelAnim"),Object,TEXT("Animation"),0},{TEXT("HitActor"),Object,TEXT("Actor"),0},
+            {TEXT("TransientSoundPriority"),Byte,NULL,0},{TEXT("SoundPriority"),Byte,NULL,0},
+            {TEXT("Unused"),Int,NULL,CPF_Const}};
+        for(INT Index=0;Index<ARRAY_COUNT(Additional);++Index)
+            if(!FindObject<UProperty>(Owner,Additional[Index].Name))
+            { *Tail=Property(Owner,Additional[Index]); Tail=&(*Tail)->Next; }
 		Function(Owner,Ar,Tail,TEXT("PostNetBeginPlay"),NULL,-1,NULL,0,FUNC_Event|FUNC_Simulated);
 		return;
 	}
@@ -235,6 +344,8 @@ static void Extend(UStruct* Owner, FArchive& Ar, UBOOL Props)
 
 static UBOOL Supported(const TCHAR* Owner, FName Type, const TCHAR* Name)
 {
+	if(!appStricmp(Owner,TEXT("Decal")))
+		return Type==NAME_Function && !appStricmp(Name,TEXT("AttachToSurface"));
 	if(!appStricmp(Owner,TEXT("Actor")))
 		return Type==NAME_Function && !appStricmp(Name,TEXT("PostNetBeginPlay"));
 	if(!appStricmp(Owner,TEXT("HUD")))
@@ -268,6 +379,16 @@ static UBOOL SupportedHUD(FName Type, const TCHAR* Name)
 		|| (Type==FName(TEXT("FloatProperty")) && !appStricmp(Name,TEXT("FaceTime")))
 		|| (Type==FName(TEXT("StructProperty")) && !appStricmp(Name,TEXT("FaceTeam")))
 		|| (Type==FName(TEXT("StrProperty")) && !appStricmp(Name,TEXT("FontInfoClass")));
+}
+
+static UBOOL SupportedBotpack(const TCHAR* Owner, FName Type, const TCHAR* Name)
+{
+	if(Type!=NAME_Function) return 0;
+	if(!appStricmp(Owner,TEXT("UT_ShieldBelt"))) return !appStricmp(Name,TEXT("HandlePickupQuery"));
+	return !appStricmp(Name,TEXT("AttachToSurface")) &&
+		(!appStricmp(Owner,TEXT("Pock")) || !appStricmp(Owner,TEXT("DirectionalBlast"))
+		|| !appStricmp(Owner,TEXT("FadeShadow")) || !appStricmp(Owner,TEXT("PlayerShadow"))
+		|| !appStricmp(Owner,TEXT("TargetShadow")));
 }
 }
 #endif

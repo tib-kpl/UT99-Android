@@ -30,10 +30,11 @@ final class UT99Paths {
     static final String LANGUAGE_ENGLISH = "int";
     static final String LANGUAGE_FRENCH = "frt";
     private static final int UT_PACKAGE_TAG = 0x9E2A83C1;
-    private static final int UT_V400_PACKAGE_VERSION = 68;
+    private static final int UT_MIN_SYSTEM_PACKAGE_VERSION = 68;
+    private static final int UT_MAX_SYSTEM_PACKAGE_VERSION = 69;
     private static final String BUNDLED_SYSTEM_PATCH_DIR = "ut99_patches/System";
     private static final String BUNDLED_SYSTEM_PATCH_MARKER = ".ut99_android_bundled_system_patches_v166k_apk_install_refresh";
-    private static final String BUNDLED_SYSTEM_PATCH_VERSION = "UT99_CONSOLE_MENU_20261014_1";
+    private static final String BUNDLED_SYSTEM_PATCH_VERSION = "UT99_CONSOLE_MENU_20261017_1";
 
     private UT99Paths() {
     }
@@ -102,9 +103,9 @@ final class UT99Paths {
         normalizeInstalledDataRoot(root);
         File system = new File(root, "System");
         File maps = new File(root, "Maps");
-        return isSupportedV400Package(new File(system, "Core.u"))
-                && isSupportedV400Package(new File(system, "Engine.u"))
-                && isSupportedV400Package(new File(system, "Botpack.u"))
+        return isSupportedSystemPackage(new File(system, "Core.u"))
+                && isSupportedSystemPackage(new File(system, "Engine.u"))
+                && isSupportedSystemPackage(new File(system, "Botpack.u"))
                 && isSupportedContentPackage(new File(maps, "CityIntro.unr"));
     }
 
@@ -292,22 +293,20 @@ final class UT99Paths {
             }
         }
 
-        // Native field offsets and replication tables in this port target the
-        // v400 package format. A directory or INI marker alone is insufficient:
-        // later Core/Engine/Botpack packages can load far enough to corrupt native
-        // state before failing. Validate the package tag and exact file version.
-        return isSupportedV400Package(new File(system, "Core.u"))
-                && isSupportedV400Package(new File(system, "Engine.u"))
-                && isSupportedV400Package(new File(system, "Botpack.u"));
+        // Native field layouts are validated by the engine for both retail and
+        // later GOTY/OldUnreal packages. Still reject unrelated package formats
+        // and licensee versions before launching native code.
+        return isSupportedSystemPackage(new File(system, "Core.u"))
+                && isSupportedSystemPackage(new File(system, "Engine.u"))
+                && isSupportedSystemPackage(new File(system, "Botpack.u"));
     }
 
-    private static boolean isSupportedV400Package(File file) {
-        return hasPackageVersion(file, UT_V400_PACKAGE_VERSION, UT_V400_PACKAGE_VERSION);
+    private static boolean isSupportedSystemPackage(File file) {
+        return hasPackageVersion(file, UT_MIN_SYSTEM_PACKAGE_VERSION, UT_MAX_SYSTEM_PACKAGE_VERSION);
     }
 
     private static boolean isSupportedContentPackage(File file) {
-        // Map serialization supports retail/GOTY versions through 69. This does
-        // not relax the exact version required for native-bound System packages.
+        // Maps can also use earlier retail content formats.
         return hasPackageVersion(file, 60, 69);
     }
 
@@ -371,6 +370,10 @@ final class UT99Paths {
             return;
         }
         long started = System.nanoTime();
+        File system = new File(root, "System");
+        boolean modernSystem = usesModernSystemPackages(system);
+        String patchVersion = BUNDLED_SYSTEM_PATCH_VERSION + (modernSystem ? ":v69" : ":v400");
+        String[] patchPackages = bundledSystemPatchPackages(modernSystem);
 
         // UT99_ANDROID_V166K_APK_INSTALL_UMENU_REFRESH:
         // Keep the v163/v1j fast path for normal launches, but do not let it hide
@@ -385,17 +388,16 @@ final class UT99Paths {
             android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             String fastRoot = prefs.getString(KEY_SYSTEM_PATCH_FAST_ROOT, null);
             String fastVersion = prefs.getString(KEY_SYSTEM_PATCH_FAST_VERSION, null);
-            if (!apkInstallRefreshNeeded && rootPath.equals(fastRoot) && BUNDLED_SYSTEM_PATCH_VERSION.equals(fastVersion)) {
+            if (!apkInstallRefreshNeeded && rootPath.equals(fastRoot) && patchVersion.equals(fastVersion)) {
                 long elapsedMs = (System.nanoTime() - started) / 1000000L;
-                Log.i(TAG, "UT99_ANDROID_V166K_SYSTEM_PATCHES: shared-pref current, skipped filesystem and asset probes packages=2");
-                Log.i("UT99_LOADPROF", "JAVA_SYSTEM_PATCHES copied=false skipped=2 markerSkip=true prefSkip=true apkRefresh=false ms=" + elapsedMs);
+                Log.i(TAG, "UT99_ANDROID_V166K_SYSTEM_PATCHES: shared-pref current, skipped filesystem and asset probes packages=" + patchPackages.length);
+                Log.i("UT99_LOADPROF", "JAVA_SYSTEM_PATCHES copied=false skipped=" + patchPackages.length + " markerSkip=true prefSkip=true apkRefresh=false ms=" + elapsedMs);
                 return;
             }
         } catch (Throwable ignored) {
         }
 
         ensureSkeleton(root);
-        File system = new File(root, "System");
         if (!system.isDirectory() && !system.mkdirs()) {
             throw new IOException("Cannot create System folder: " + system.getAbsolutePath());
         }
@@ -405,12 +407,11 @@ final class UT99Paths {
         // which was safe for menu rollout but wastes I/O every start. v161 keeps
         // the same safety on first run/new marker, then skips copying while the
         // installed marker and files are already current.
-        String[] patchPackages = {"UMenu.u", "UTMenu.u", "UT99ConsoleMenu.u", "UT99ConsoleMenu.int", "UT99ConsoleMenu.frt"};
         File marker = new File(system, BUNDLED_SYSTEM_PATCH_MARKER);
         boolean markerCurrent = false;
         if (marker.isFile()) {
             String markerText = readUtf8(marker);
-            markerCurrent = markerText.indexOf(BUNDLED_SYSTEM_PATCH_VERSION) >= 0;
+            markerCurrent = markerText.trim().equals(patchVersion);
         }
 
         // UT99_ANDROID_V163_SYSTEM_PATCH_MARKER_FAST_SKIP:
@@ -426,7 +427,7 @@ final class UT99Paths {
             }
         }
         if (!apkInstallRefreshNeeded && markerCurrent && allTargetsPresent) {
-            rememberFastSystemPatchSkip(context, rootPath);
+            rememberFastSystemPatchSkip(context, rootPath, patchVersion);
             long elapsedMs = (System.nanoTime() - started) / 1000000L;
             Log.i(TAG, "UT99_ANDROID_V166K_SYSTEM_PATCHES: marker current, skipped asset probes packages=" + patchPackages.length);
             Log.i("UT99_LOADPROF", "JAVA_SYSTEM_PATCHES copied=false skipped=" + patchPackages.length + " markerSkip=true prefSkip=false apkRefresh=false ms=" + elapsedMs);
@@ -458,10 +459,10 @@ final class UT99Paths {
         }
 
         if (copiedAny || !markerCurrent || !marker.isFile()) {
-            writeUtf8(marker, BUNDLED_SYSTEM_PATCH_VERSION + "\n");
+            writeUtf8(marker, patchVersion + "\n");
         }
         if (new File(system, "UMenu.u").isFile() && new File(system, "UTMenu.u").isFile()) {
-            rememberFastSystemPatchSkip(context, rootPath);
+            rememberFastSystemPatchSkip(context, rootPath, patchVersion);
             rememberApkInstallRefreshV166k(context, apkLastUpdateTime);
         }
         long elapsedMs = (System.nanoTime() - started) / 1000000L;
@@ -509,7 +510,19 @@ final class UT99Paths {
         }
     }
 
-    private static void rememberFastSystemPatchSkip(Context context, String rootPath) {
+    static boolean usesModernSystemPackages(File system) {
+        return hasPackageVersion(new File(system, "Engine.u"), 69, 69);
+    }
+
+    static String[] bundledSystemPatchPackages(boolean modernSystem) {
+        // Preserve newer menu APIs used by server mods and the tournament.
+        // The console menu adapts either generation without replacing it.
+        return modernSystem
+                ? new String[]{"UT99ConsoleMenu.u", "UT99ConsoleMenu.int", "UT99ConsoleMenu.frt"}
+                : new String[]{"UMenu.u", "UTMenu.u", "UT99ConsoleMenu.u", "UT99ConsoleMenu.int", "UT99ConsoleMenu.frt"};
+    }
+
+    private static void rememberFastSystemPatchSkip(Context context, String rootPath, String patchVersion) {
         if (context == null || rootPath == null || rootPath.length() == 0) {
             return;
         }
@@ -517,7 +530,7 @@ final class UT99Paths {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_SYSTEM_PATCH_FAST_ROOT, rootPath)
-                    .putString(KEY_SYSTEM_PATCH_FAST_VERSION, BUNDLED_SYSTEM_PATCH_VERSION)
+                    .putString(KEY_SYSTEM_PATCH_FAST_VERSION, patchVersion)
                     .commit();
         } catch (Throwable ignored) {
         }

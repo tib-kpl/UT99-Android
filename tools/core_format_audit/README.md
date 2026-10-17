@@ -61,9 +61,19 @@ Pour vérifier un appel compilé contre la signature v400 **void**, compiler
 `-Legacy` au contrôleur. L'affectation doit fonctionner et le nom constant de
 l'objet doit rester intact.
 
-Ces tests passent sur ARMv7 et ARM64 avec Core v400, et les 22 contrôles passent
-également dans un essai isolé avec Core 469f-rc5 et Engine/Botpack v400. Cela ne
-valide pas Engine 469, Registry, tous les usages de pointeurs natifs, les
-fonctionnalités de jeu 469 ou tous les mods. Le lanceur publié conserve son
-contrôle des paquets système v400. Retirer les mutateurs, paquets et INI de
-test ainsi que toute URL de diagnostic après vérification.
+Pour l'audit étendu avec Core/Engine/Botpack 469f-rc5, compiler avec
+`-ModernEngineAPIs`, copier aussi `RegistryFixture_Settings.int` dans System,
+puis lancer :
+
+```
+DM-Oblivion?game=UT99CoreFormatAudit.EngineGameAudit?MinPlayers=0
+```
+
+Réinitialiser `CoreFormatFixture.ini` avant chaque essai. Le contrôleur
+`tools/check_ut99_engine_api_audit.ps1 -ClientLogs <journaux>` exige les
+54 contrôles : API Core et pointeurs, tableaux dynamiques et statiques,
+opérateurs de chaînes, Registry et cache de polices, ainsi que le démarrage
+effectif du match. Cet audit passe sur ARMv7 et ARM64 avec les packages 469f.
+Il ne certifie pas tous les usages de pointeurs, les fonctionnalités 469 ou
+tous les mods. Retirer les mutateurs, paquets et INI de test ainsi que toute
+URL de diagnostic après vérification.

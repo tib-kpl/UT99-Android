@@ -474,6 +474,9 @@ struct DLL_EXPORT_CLASS KeyPoint
 class DLL_EXPORT_CLASS UIceTexture : public UFractalTexture
 {
 	DECLARE_CLASS(UIceTexture,UFractalTexture,0)
+#if defined(PLATFORM_ANDROID)
+	void StaticConstructor();
+#endif
 
 	// Persistent variables.
     UTexture*   GlassTexture;

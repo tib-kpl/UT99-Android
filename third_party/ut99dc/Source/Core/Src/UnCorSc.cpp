@@ -283,6 +283,34 @@ void UObject::execArrayElement( FFrame& Stack, RESULT_DECL )
 	GProperty = NULL;
 	Stack.Step( this, NULL );
 
+    if(UArrayProperty* Dynamic=Cast<UArrayProperty>(GProperty))
+    {
+        FArray* Array=(FArray*)GPropAddr;
+        GProperty=Dynamic->Inner;
+        GPropAddr=NULL;
+        INT Extent=Max(Dynamic->StaticArrayDim,Array ? Array->Num() : 0);
+        if(Dynamic->StaticArrayDim>0 && (Index<0 || Index>=Extent))
+        {
+            Stack.Logf(NAME_ScriptWarning,TEXT("Accessed legacy array out of bounds (%i/%i)"),Index,Extent);
+            Index=Clamp(Index,0,Extent-1);
+        }
+        if(Array && Dynamic->StaticArrayDim>0 && Array->Num()<Dynamic->StaticArrayDim
+        && Dynamic->StaticArrayDim<=MAXINT/(2*Max(Dynamic->Inner->ElementSize,4)))
+            Array->AddZeroed(Dynamic->Inner->ElementSize,Dynamic->StaticArrayDim-Array->Num());
+        if(Array && Index>=0 && Index<Array->Num())
+        {
+            GPropAddr=(BYTE*)Array->GetData()+Index*Dynamic->Inner->ElementSize;
+            if(Result) Dynamic->Inner->CopySingleValue(Result,GPropAddr);
+        }
+        else if(Result)
+        {
+            BYTE* Empty=(BYTE*)appAlloca(Dynamic->Inner->ElementSize);
+            appMemzero(Empty,Dynamic->Inner->ElementSize);
+            Dynamic->Inner->CopySingleValue(Result,Empty);
+        }
+        return;
+    }
+
 	// Add scaled offset to base pointer.
 	if( GProperty && GPropAddr )
 	{
@@ -306,38 +334,137 @@ void UObject::execArrayElement( FFrame& Stack, RESULT_DECL )
 }
 IMPLEMENT_FUNCTION( UObject, EX_ArrayElement, execArrayElement );
 
+// Destroy owned values before shrinking or moving their array storage.
+static void DestroyScriptArrayRange(UArrayProperty* Property,FArray* Array,INT Start,INT Count)
+{
+    if( Property->Inner->PropertyFlags & CPF_NeedCtorLink )
+        for( INT Index=Start;Index<Start+Count;++Index )
+            Property->Inner->DestroyValue((BYTE*)Array->GetData()+Index*Property->Inner->ElementSize);
+}
+static UBOOL ValidScriptArraySize(UArrayProperty* Property,INT Count)
+{
+    // FArray grows its allocation geometrically using signed integer arithmetic.
+    return Count>=0 && Count<=MAXINT/(2*Max(Property->Inner->ElementSize,4));
+}
+
 void UObject::execDynArrayElement( FFrame& Stack, RESULT_DECL )
 {
-	guardSlow(UObject::execArrayElement);
-
-	// Get array index expression.
-	INT Index=0;
-	Stack.Step( Stack.Object, &Index );
-
-	// Get FArray (only works with variables that have a GProperty!!) This is experimental and doesn't work yet.
-	FArray* Array=NULL;
-	Stack.Step( this, *(BYTE**)&Array );
-	check(GProperty);
-	check(GProperty->IsA(UArrayProperty::StaticClass()));
-	check(Array);//!!
-	check(Array->Num()!=0);//!! Needs to handle zero-element arrays gracefully.
-
-	// Bounds check.
-	if( Index>=Array->Num() || Index<0 )
-	{
-		// Display out-of-bounds warning and continue on with index clamped to valid range.
-		//!!must work like null-context expressions.
-		Stack.Logf( TEXT("Accessed array out of bounds (%i/%i)"), Index, GProperty->ArrayDim );
-		Index = Clamp<INT>( Index, 0, (INT)Array->Num() - 1 );
-	}
-
-	// Add scaled offset to base pointer.
-	//if( Result )
-	//	Result = (BYTE*)Array->GetData() + *(INT*)Addr * ((UArrayProperty*)GProperty)->Inner->ElementSize;
-
-	unguardexecSlow;
+    guard(UObject::execDynArrayElement);
+    P_GET_INT(Index);
+    GProperty=NULL;
+    GPropAddr=NULL;
+    Stack.Step(this,NULL);
+    UArrayProperty* Property=Cast<UArrayProperty>(GProperty);
+    FArray* Array=Property ? (FArray*)GPropAddr : NULL;
+    GProperty=Property ? Property->Inner : NULL;
+    GPropAddr=NULL;
+    if( !Property ) return;
+    // array<T,N> lazily restores its old fixed extent, including on reads.
+    if(Array && Property->StaticArrayDim>0 && Array->Num()<Property->StaticArrayDim
+    && Property->StaticArrayDim<=MAXINT/(2*Max(Property->Inner->ElementSize,4)))
+        Array->AddZeroed(Property->Inner->ElementSize,Property->StaticArrayDim-Array->Num());
+    if(Array && Property->StaticArrayDim>0 && Array->Num()>0 && (Index<0 || Index>=Array->Num()))
+    {
+        Stack.Logf(NAME_ScriptWarning,TEXT("Accessed array '%s' out of bounds (%i/%i)"),Property->GetName(),Index,Array->Num());
+        Index=Clamp(Index,0,Array->Num()-1);
+    }
+    if( !Array || Index<0 || Index>=Array->Num() )
+    {
+        Stack.Logf(NAME_ScriptWarning,TEXT("Accessed array '%s' out of bounds (%i/%i)"),Property->GetName(),Index,Array ? Array->Num() : 0);
+        if( Result )
+        {
+            BYTE* Empty=(BYTE*)appAlloca(Property->Inner->ElementSize);
+            appMemzero(Empty,Property->Inner->ElementSize);
+            Property->Inner->CopySingleValue(Result,Empty);
+        }
+        return;
+    }
+    GPropAddr=(BYTE*)Array->GetData()+Index*Property->Inner->ElementSize;
+    if( Result ) Property->Inner->CopySingleValue(Result,GPropAddr);
+    unguardexec;
 }
 IMPLEMENT_FUNCTION( UObject, EX_DynArrayElement, execDynArrayElement );
+
+void UObject::execDynArrayLength( FFrame& Stack, RESULT_DECL )
+{
+    guard(UObject::execDynArrayLength);
+    GProperty=NULL;
+    GPropAddr=NULL;
+    Stack.Step(this,NULL);
+    UArrayProperty* Property=Cast<UArrayProperty>(GProperty);
+    FArray* Array=Property ? (FArray*)GPropAddr : NULL;
+    UBOOL Assign=*Stack.Code!=EX_EndFunctionParms;
+    P_GET_INT_OPTX(NewLength,0);
+    P_FINISH;
+    if( Array && Assign )
+    {
+        if( !ValidScriptArraySize(Property,NewLength) )
+            Stack.Logf(NAME_ScriptWarning,TEXT("Invalid dynamic array length for '%s': %i"),Property->GetName(),NewLength);
+        else if( NewLength<Array->Num() )
+        {
+            DestroyScriptArrayRange(Property,Array,NewLength,Array->Num()-NewLength);
+            Array->Remove(NewLength,Array->Num()-NewLength,Property->Inner->ElementSize);
+        }
+        else if( NewLength>Array->Num() )
+            Array->AddZeroed(Property->Inner->ElementSize,NewLength-Array->Num());
+    }
+    if( Result ) *(INT*)Result=Array ? Array->Num() : 0;
+    GPropAddr=NULL;
+    GProperty=NULL;
+    unguardexec;
+}
+IMPLEMENT_FUNCTION( UObject, 640, execDynArrayLength );
+
+void UObject::execDynArrayInsert( FFrame& Stack, RESULT_DECL )
+{
+    guard(UObject::execDynArrayInsert);
+    GProperty=NULL;
+    GPropAddr=NULL;
+    Stack.Step(this,NULL);
+    UArrayProperty* Property=Cast<UArrayProperty>(GProperty);
+    FArray* Array=Property ? (FArray*)GPropAddr : NULL;
+    P_GET_INT(Index);
+    P_GET_INT(Count);
+    P_FINISH;
+    if( Array && Count>0 )
+    {
+        if( Count>MAXINT-Array->Num() || !ValidScriptArraySize(Property,Array->Num()+Count) )
+            Stack.Logf(NAME_ScriptWarning,TEXT("Invalid insertion count in '%s': %i"),Property->GetName(),Count);
+        else
+            Array->InsertZeroed(Clamp(Index,0,Array->Num()),Count,Property->Inner->ElementSize);
+    }
+    GPropAddr=NULL;
+    GProperty=NULL;
+    unguardexec;
+}
+IMPLEMENT_FUNCTION( UObject, 641, execDynArrayInsert );
+
+void UObject::execDynArrayRemove( FFrame& Stack, RESULT_DECL )
+{
+    guard(UObject::execDynArrayRemove);
+    GProperty=NULL;
+    GPropAddr=NULL;
+    Stack.Step(this,NULL);
+    UArrayProperty* Property=Cast<UArrayProperty>(GProperty);
+    FArray* Array=Property ? (FArray*)GPropAddr : NULL;
+    P_GET_INT(Index);
+    P_GET_INT(Count);
+    P_FINISH;
+    if( Array && Count>0 )
+    {
+        Index=Clamp(Index,0,Array->Num());
+        Count=Min(Count,Array->Num()-Index);
+        if( Count )
+        {
+            DestroyScriptArrayRange(Property,Array,Index,Count);
+            Array->Remove(Index,Count,Property->Inner->ElementSize);
+        }
+    }
+    GPropAddr=NULL;
+    GProperty=NULL;
+    unguardexec;
+}
+IMPLEMENT_FUNCTION( UObject, 642, execDynArrayRemove );
 
 void UObject::execBoolVariable( FFrame& Stack, RESULT_DECL )
 {
@@ -579,9 +706,21 @@ void UObject::execLet( FFrame& Stack, RESULT_DECL )
 	if( !GPropAddr )
 	{
 		Stack.Logf( NAME_ScriptWarning, TEXT("Attempt to assigned variable through None") );
-		static BYTE Crud[1024];//!!temp
-		GPropAddr = Crud;
-		appMemzero( GPropAddr, sizeof(FString) );
+        // A failed dynamic-array lvalue still evaluates the RHS, but its owned
+        // strings/arrays must be destroyed instead of leaking in a static buffer.
+        if( GProperty )
+        {
+            UProperty* Property=GProperty;
+            BYTE* Discard=(BYTE*)appAlloca(Property->GetSize());
+            appMemzero(Discard,Property->GetSize());
+            Stack.Step(Stack.Object,Discard);
+            for(INT Index=0;Index<Property->ArrayDim;++Index)
+                Property->DestroyValue(Discard+Index*Property->ElementSize);
+            return;
+        }
+        static BYTE Crud[1024];
+        GPropAddr=Crud;
+        appMemzero(GPropAddr,sizeof(FString));
 	}
 	Stack.Step( Stack.Object, GPropAddr ); // Evaluate expression into variable.
 
@@ -3134,6 +3273,51 @@ void UObject::execLocs( FFrame& Stack, RESULT_DECL )
     *(FString*)Result = S.Locs();
 }
 IMPLEMENT_FUNCTION( UObject, 238, execLocs );
+
+#if defined(PLATFORM_ANDROID)
+void UObject::execConcatEqual_StringString(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR_REF(A);
+    P_GET_STR(B);
+    P_FINISH;
+    *A+=B;
+    *(FString*)Result=*A;
+}
+IMPLEMENT_FUNCTION(UObject,322,execConcatEqual_StringString);
+
+void UObject::execAtEqual_StringString(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR_REF(A);
+    P_GET_STR(B);
+    P_FINISH;
+    *A+=TEXT(" ");
+    *A+=B;
+    *(FString*)Result=*A;
+}
+IMPLEMENT_FUNCTION(UObject,323,execAtEqual_StringString);
+
+void UObject::execSubtractEqual_StringString(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR_REF(A);
+    P_GET_STR(B);
+    P_FINISH;
+    if(B.Len())
+    {
+        FString Original=*A, Out;
+        INT Start=0;
+        for(INT Pos=0;Pos+B.Len()<=Original.Len();)
+        {
+            if(!appStrncmp(*Original+Pos,*B,B.Len()))
+            { Out+=Original.Mid(Start,Pos-Start); Pos+=B.Len(); Start=Pos; }
+            else ++Pos;
+        }
+        Out+=Original.Mid(Start);
+        *A=Out;
+    }
+    *(FString*)Result=*A;
+}
+IMPLEMENT_FUNCTION(UObject,324,execSubtractEqual_StringString);
+#endif
 
 void UObject::execRepl( FFrame& Stack, RESULT_DECL )
 {

@@ -72,6 +72,12 @@ class ENGINE_API UCanvas : public UObject
 	UViewport*		Viewport;
 	struct FSceneNode* Frame;
 	class URenderBase* Render; // Only valid during UGameEngine::Draw
+#if defined(PLATFORM_ANDROID)
+    INT UglyFontScaling;
+    FStringNoInit DynamicFontUnicodeRange;
+    BITFIELD bSnapToPixels:1 GCC_PACK(4);
+    void StaticConstructor();
+#endif
 
 	// UCanvas interface.
 	virtual void Init( UViewport* InViewport );
@@ -92,6 +98,10 @@ class ENGINE_API UCanvas : public UObject
 	DECLARE_FUNCTION(execDrawTileClipped)
 	DECLARE_FUNCTION(execDrawTextClipped)
 	DECLARE_FUNCTION(execTextSize)
+#if defined(PLATFORM_ANDROID)
+    DECLARE_FUNCTION(execCreateFont)
+    DECLARE_FUNCTION(execGetDesktopDPI)
+#endif
 	DECLARE_FUNCTION(execDrawPortal)
     void eventReset()
     {

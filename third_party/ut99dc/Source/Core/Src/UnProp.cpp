@@ -1109,6 +1109,13 @@ IMPLEMENT_CLASS(UFixedArrayProperty);
 	UArrayProperty.
 -----------------------------------------------------------------------------*/
 
+void UArrayProperty::StaticConstructor()
+{
+    // The official format stores the old static-array extent in an IntProperty
+    // named "0" on ArrayProperty metadata (for example Actor.Touching = 4).
+    new(GetClass(),TEXT("0"),RF_Public)UIntProperty(CPP_PROPERTY(StaticArrayDim),TEXT(""),0);
+}
+
 void UArrayProperty::Link( FArchive& Ar, UProperty* Prev )
 {
 	guard(UArrayProperty::Link);
@@ -1245,8 +1252,12 @@ void UArrayProperty::CopySingleValue( void* Dest, void* Src ) const
 	guardSlow(UArrayProperty::CopySingleValue);
 	FArray* SrcArray  = (FArray*)Src;
 	FArray* DestArray = (FArray*)Dest;
+	if( DestArray==SrcArray ) return;
 	INT     Size      = Inner->ElementSize;
-	DestArray->Empty( Size, SrcArray->Num() );//!!must destruct it if really copying
+	if( Inner->PropertyFlags & CPF_NeedCtorLink )
+		for(INT Index=0;Index<DestArray->Num();++Index)
+			Inner->DestroyValue((BYTE*)DestArray->GetData()+Index*Size);
+	DestArray->Empty( Size, SrcArray->Num() );
 	if( Inner->PropertyFlags & CPF_NeedCtorLink )
 	{
 		// Copy all the elements.

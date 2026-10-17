@@ -543,3 +543,11 @@ class CORE_API UConst : public UField
 /*-----------------------------------------------------------------------------
 	The End.
 -----------------------------------------------------------------------------*/
+
+#if defined(PLATFORM_ANDROID)
+// Explicit native member layouts allow multiple package field orders without
+// permitting unknown fields, mismatched types or out-of-range offsets.
+CORE_API void UT99RegisterNativeFieldLayout(UStruct* Owner,const TCHAR* Name,const TCHAR* Type,INT Offset,INT Size,DWORD BoolMask=0,INT Capacity=1);
+template<class T> inline INT UT99NativeFieldCapacity(T&) { return 1; }
+template<class T,INT Count> inline INT UT99NativeFieldCapacity(T (&)[Count]) { return Count; }
+#endif

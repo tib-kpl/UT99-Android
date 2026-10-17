@@ -4769,6 +4769,46 @@ IMPLEMENT_CLASS(UWetTexture);
 	UIceTexture object implementation.
 ----------------------------------------------------------------------------*/
 
+#if defined(PLATFORM_ANDROID)
+void UIceTexture::StaticConstructor()
+{
+#define ICE_FIELD(Member,Name,Type) UT99RegisterNativeFieldLayout(GetClass(),TEXT(#Name),TEXT(#Type),STRUCT_OFFSET(UIceTexture,Member),sizeof(Member),0,UT99NativeFieldCapacity(Member));
+	ICE_FIELD(GlassTexture,GlassTexture,ObjectProperty)
+	ICE_FIELD(SourceTexture,SourceTexture,ObjectProperty)
+	ICE_FIELD(PanningStyle,PanningStyle,ByteProperty)
+	ICE_FIELD(TimeMethod,TimeMethod,ByteProperty)
+	ICE_FIELD(HorizPanSpeed,HorizPanSpeed,ByteProperty)
+	ICE_FIELD(VertPanSpeed,VertPanSpeed,ByteProperty)
+	ICE_FIELD(Frequency,Frequency,ByteProperty)
+	ICE_FIELD(Amplitude,Amplitude,ByteProperty)
+	ICE_FIELD(MasterCount,MasterCount,FloatProperty)
+	ICE_FIELD(UDisplace,UDisplace,FloatProperty)
+	ICE_FIELD(VDisplace,VDisplace,FloatProperty)
+	ICE_FIELD(UPosition,UPosition,FloatProperty)
+	ICE_FIELD(VPosition,VPosition,FloatProperty)
+	ICE_FIELD(TickAccu,TickAccu,FloatProperty)
+	ICE_FIELD(OldUDisp,OldUDisplace,IntProperty)
+	ICE_FIELD(OldVDisp,OldVDisplace,IntProperty)
+	ICE_FIELD(OldGlassTex,OldGlassTex,ObjectProperty)
+	ICE_FIELD(OldSourceTex,OldSourceTex,ObjectProperty)
+	ICE_FIELD(LocalSourceBitmap,LocalSource,IntProperty)
+	ICE_FIELD(LocalSourceBitmap,LocalSource,PointerProperty)
+	ICE_FIELD(ForceRefresh,ForceRefresh,IntProperty)
+#undef ICE_FIELD
+	BYTE Before[sizeof(UIceTexture)];
+	UBOOL Previous=MoveIce;
+	appMemcpy(Before,this,sizeof(UIceTexture));
+	MoveIce=!Previous;
+	INT Offset=0; DWORD Mask=0;
+	for(INT Byte=sizeof(UObject);Byte<sizeof(UIceTexture);++Byte)
+		if(Before[Byte]!=((BYTE*)this)[Byte])
+		{ Offset=Byte & ~3; Mask=(DWORD)(Before[Byte]^((BYTE*)this)[Byte])<<((Byte & 3)*8); break; }
+	MoveIce=Previous;
+	check(Mask);
+	UT99RegisterNativeFieldLayout(GetClass(),TEXT("MoveIce"),TEXT("BoolProperty"),Offset,sizeof(DWORD),Mask);
+}
+#endif
+
 UIceTexture::UIceTexture()
 {
 	guard(UIceTexture::UIceTexture);

@@ -354,6 +354,9 @@ public: \
 //
 class CORE_API UObject : public FUnknown
 {
+#if defined(PLATFORM_ANDROID)
+    friend class URegistry;
+#endif
 	// Declarations.
 	DECLARE_BASE_CLASS(UObject,UObject,CLASS_Abstract)
 	typedef UObject WithinClass;
@@ -579,6 +582,9 @@ public:
 	DECLARE_FUNCTION(execInstanceVariable)
 	DECLARE_FUNCTION(execDefaultVariable)
 	DECLARE_FUNCTION(execArrayElement)
+	DECLARE_FUNCTION(execDynArrayLength)
+	DECLARE_FUNCTION(execDynArrayInsert)
+	DECLARE_FUNCTION(execDynArrayRemove)
 	DECLARE_FUNCTION(execDynArrayElement)
 	DECLARE_FUNCTION(execBoolVariable)
 	DECLARE_FUNCTION(execClassDefaultVariable)
@@ -784,6 +790,9 @@ public:
 	DECLARE_FUNCTION(execRight)
 	DECLARE_FUNCTION(execLocs)
 	DECLARE_FUNCTION(execRepl)
+    DECLARE_FUNCTION(execConcatEqual_StringString)
+    DECLARE_FUNCTION(execAtEqual_StringString)
+    DECLARE_FUNCTION(execSubtractEqual_StringString)
 	DECLARE_FUNCTION(execRandRange)
 	DECLARE_FUNCTION(execSetUTracing)
 	DECLARE_FUNCTION(execIsUTracing)

@@ -78,6 +78,163 @@ static const TCHAR* UT99AndroidFallbackRegistryObject( const TCHAR* ClassName, I
 }
 #endif
 
+
+#if defined(PLATFORM_ANDROID)
+extern "C" void UT99AndroidTextInput(int);
+void APlayerPawn::execStartTextInput(FFrame& Stack, RESULT_DECL)
+{
+    P_FINISH;
+    if(Cast<UViewport>(Player)) UT99AndroidTextInput(1);
+}
+void APlayerPawn::execStopTextInput(FFrame& Stack, RESULT_DECL)
+{
+    P_FINISH;
+    if(Cast<UViewport>(Player)) UT99AndroidTextInput(0);
+}
+
+void APawn::execCheckValidSkinPackage(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR(SkinPack);
+    P_GET_STR(MeshName);
+    P_FINISH;
+    *(UBOOL*)Result=1;
+    // Servers accept only packages advertised in their own package map.
+    // The public signature retains MeshName, but the modern check is per package.
+    for(TObjectIterator<UGameEngine> It;It;++It)
+    {
+        if(!It->GLevel || !It->GLevel->NetDriver) return;
+        UPackageMap* Map=It->GLevel->NetDriver->MasterMap;
+        *(UBOOL*)Result=0;
+        if(Map)
+            for(INT i=0;i<Map->List.Num();++i)
+                if(Map->List(i).Parent && !appStricmp(Map->List(i).Parent->GetName(),*SkinPack))
+                { *(UBOOL*)Result=1; return; }
+        return;
+    }
+}
+
+void APawn::execGetNextViewTarget(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_OBJECT(AActor,CurrentViewTarget);
+    P_GET_OBJECT(UClass,ActorClass);
+    P_GET_UBOOL(bCheckCanSpectate);
+    P_FINISH;
+    *(AActor**)Result=NULL;
+    ULevel* Level=GetLevel();
+    if(!Level || !ActorClass) return;
+    INT Start=Level->Actors.FindItemIndex(CurrentViewTarget);
+    for(INT Step=1;Step<=Level->Actors.Num();++Step)
+    {
+        INT Index=(Start+Step)%Level->Actors.Num();
+        AActor* Candidate=Level->Actors(Index);
+        if(!Candidate || Candidate==this || Candidate->bDeleteMe || !Candidate->IsA(ActorClass)) continue;
+        if(bCheckCanSpectate && Level->GetLevelInfo()->Game)
+        {
+            AGameInfo* Game=Level->GetLevelInfo()->Game;
+            UFunction* CanSpectate=Game->FindFunction(TEXT("CanSpectate"));
+            if(!CanSpectate) continue;
+            struct { APawn* Viewer; AActor* ViewTarget; UBOOL ReturnValue; } Parms;
+            appMemzero(&Parms,sizeof(Parms));
+            Parms.Viewer=this; Parms.ViewTarget=Candidate;
+            Game->ProcessEvent(CanSpectate,&Parms);
+            if(!Parms.ReturnValue) continue;
+        }
+        *(AActor**)Result=Candidate; return;
+    }
+}
+
+void AGameInfo::execGetMutatorList(FFrame& Stack, RESULT_DECL)
+{
+    P_FINISH;
+    FString Names;
+    TArray<FRegistryObjectInfo> Registry;
+    GetRegistryObjects(Registry,UClass::StaticClass(),AMutator::StaticClass(),0);
+    TArray<AMutator*> Visited;
+    for(AMutator* M=BaseMutator ? BaseMutator->NextMutator : NULL;M;M=M->NextMutator)
+    {
+        if(Visited.FindItemIndex(M)!=INDEX_NONE) break;
+        Visited.AddItem(M);
+        for(INT i=0;i<Registry.Num();++i)
+            if(!appStricmp(*Registry(i).Object,M->GetClass()->GetPathName()))
+            {
+                FString Desc=Registry(i).Description;
+                INT Comma=Desc.InStr(TEXT(","));
+                if(Comma!=INDEX_NONE) Desc=Desc.Left(Comma);
+                if(Names.Len()) Names+=TEXT(", ");
+                Names+=Desc;
+                break;
+            }
+    }
+    *(FString*)Result=Names;
+}
+
+static UBOOL UT99ValidCacheGuid(const FString& Guid)
+{
+    if(Guid.Len()!=32) return 0;
+    for(INT i=0;i<Guid.Len();++i)
+    {
+        TCHAR C=appToUpper((*Guid)[i]);
+        if(!((C>='0' && C<='9') || (C>='A' && C<='F'))) return 0;
+    }
+    return 1;
+}
+
+void AActor::execGetCacheEntry(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_INT(Num);
+    P_GET_STR_REF(Guid);
+    P_GET_STR_REF(Filename);
+    P_FINISH;
+    *(UBOOL*)Result=0;
+    *Guid=TEXT(""); *Filename=TEXT("");
+    if(Num<0) return;
+    FString Ini=GSys->CachePath * TEXT("cache.ini");
+    TMultiMap<FString,FString>* Entries=GConfig->GetSectionPrivate(TEXT("Cache"),0,1,*Ini);
+    if(!Entries) return;
+    for(TMultiMap<FString,FString>::TIterator It(*Entries);It;++It)
+    {
+        if(!UT99ValidCacheGuid(It.Key()) || !It.Value().Len()) continue;
+        FString Source=GSys->CachePath * (It.Key()+GSys->CacheExt);
+        if(GFileManager->FileSize(*Source)<0) continue;
+        if(Num--==0)
+        {
+            *Guid=It.Key(); *Filename=It.Value(); *(UBOOL*)Result=1; return;
+        }
+    }
+}
+
+void AActor::execMoveCacheEntry(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR(Guid);
+    P_GET_STR_OPTX(NewFilename,TEXT(""));
+    P_FINISH;
+    *(UBOOL*)Result=0;
+    if(!UT99ValidCacheGuid(Guid)) return;
+    FString Ini=GSys->CachePath * TEXT("cache.ini"), Filename;
+    if(!GConfig->GetString(TEXT("Cache"),*Guid,Filename,*Ini)) return;
+    if(NewFilename.Len()) Filename=NewFilename;
+    if(!Filename.Len() || Filename.InStr(TEXT(".."))!=INDEX_NONE) return;
+    for(INT i=0;i<Filename.Len();++i)
+        if((*Filename)[i]=='/' || (*Filename)[i]=='\\' || (*Filename)[i]==':' || (*Filename)[i]<32) return;
+    INT Dot=Filename.InStr(TEXT("."),1);
+    if(Dot==INDEX_NONE) return;
+    FString Wildcard=TEXT("*")+Filename.Mid(Dot);
+    for(INT i=0;i<GSys->Paths.Num();++i)
+    {
+        INT Star=GSys->Paths(i).InStr(TEXT("*"));
+        if(Star==INDEX_NONE || appStricmp(*GSys->Paths(i).Mid(Star),*Wildcard)) continue;
+        FString Dest=GSys->Paths(i).Left(Star)+Filename;
+        FString Source=GSys->CachePath * (Guid+GSys->CacheExt);
+        // Preserve installed content and the cache record on any failure.
+        if(GFileManager->FileSize(*Dest)>=0 || !GFileManager->Move(*Dest,*Source,0)) return;
+        GConfig->SetString(TEXT("Cache"),*Guid,TEXT(""),*Ini);
+        GConfig->Flush(0,*Ini);
+        *(UBOOL*)Result=1;
+        return;
+    }
+}
+#endif
+
 void AActor::execGetNextInt( FFrame& Stack, RESULT_DECL )
 {
 	guard(AActor::execGetNextInt);
