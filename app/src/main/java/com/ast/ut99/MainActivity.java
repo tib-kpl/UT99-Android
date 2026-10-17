@@ -64,6 +64,9 @@ public class MainActivity extends Activity {
     private TextView installMessageText;
     private long launchRequestedAtMs;
     private boolean launchedLegacySafeMode;
+    private boolean installingGoty;
+    private Thread gotyInstallerThread;
+    private volatile boolean gotyInstallCancelled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,9 +131,15 @@ public class MainActivity extends Activity {
     }
 
     private void continueStartup() {
+        if (installingGoty) return;
         selectedRoot = UT99Paths.resolveDataRoot(this);
         UT99Paths.ensureSkeleton(UT99Paths.installRoot(this));
         UT99Paths.normalizeInstalledDataRoot(selectedRoot);
+
+        if (getIntent().getBooleanExtra("manage_game_data", false)) {
+            showMissingDataScreen();
+            return;
+        }
 
         if (UT99Paths.hasLaunchableGameData(selectedRoot)) {
             UT99Paths.rememberDataRoot(this, selectedRoot);
@@ -304,16 +313,16 @@ public class MainActivity extends Activity {
         final boolean ouyaMode = isOuyaDevice();
 
         TextView title = new TextView(this);
-        title.setText(hasLaunchData
+        title.setText(installText(hasLaunchData ? "Unreal Tournament prêt" : "Données Unreal Tournament introuvables", hasLaunchData
                 ? t("Unreal Tournament bereit", "Unreal Tournament ready")
-                : t("Unreal Tournament-Daten fehlen", "Unreal Tournament data not found"));
+                : t("Unreal Tournament-Daten fehlen", "Unreal Tournament data not found")));
         title.setTextSize(24.0f);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
 
         String extra = "";
         if (lastImportMessage != null && lastImportMessage.length() > 0) {
-            extra = t("\n\nLetzte Meldung:\n", "\n\nLast message:\n") + lastImportMessage;
+            extra = installText("\n\nDernier message :\n", t("\n\nLetzte Meldung:\n", "\n\nLast message:\n")) + lastImportMessage;
         }
 
         TextView message = new TextView(this);
@@ -344,6 +353,12 @@ public class MainActivity extends Activity {
                             "Install target:\n" + UT99Paths.installRoot(this).getAbsolutePath() + "\n\n" +
                             "Required folders:\nSystem, Maps, Textures, Sounds, Music" + extra));
         }
+        if ("fr".equalsIgnoreCase(getResources().getConfiguration().locale.getLanguage())) {
+            message.setText((hasLaunchData ? "Données du jeu trouvées dans :\n" + selectedRoot.getAbsolutePath()
+                    : "Choisis ton dossier UT99 ou une archive ZIP, ou télécharge GOTY depuis OldUnreal.\n\n"
+                    + "L’installation GOTY permet de choisir la langue, le stockage interne ou la microSD et le nom du dossier.\n\n"
+                    + "Dossiers requis : System, Maps, Textures, Sounds, Music") + extra);
+        }
         message.setTextSize(16.0f);
         message.setGravity(Gravity.CENTER);
         message.setPadding(0, 24, 0, 24);
@@ -351,7 +366,7 @@ public class MainActivity extends Activity {
 
         Button firstFocusButton = null;
         if (hasLaunchData) {
-            firstFocusButton = button(t("Unreal Tournament starten", "Start Unreal Tournament"), v -> launchGame(selectedRoot));
+            firstFocusButton = button(installText("Lancer Unreal Tournament", t("Unreal Tournament starten", "Start Unreal Tournament")), v -> launchGame(selectedRoot));
             body.addView(firstFocusButton);
         }
 
@@ -364,16 +379,18 @@ public class MainActivity extends Activity {
             body.addView(localZipButton);
             if (firstFocusButton == null) firstFocusButton = localZipButton;
         } else {
-            Button folderButton = button(t("UT99-Ordner auswählen", "Select UT99 folder"), v -> openFolderPicker());
+            Button folderButton = button(installText("Choisir mon dossier UT99", t("UT99-Ordner auswählen", "Select UT99 folder")), v -> openFolderPicker());
             body.addView(folderButton);
             if (firstFocusButton == null) firstFocusButton = folderButton;
 
-            Button zipButton = button(t("UT99-ZIP auswählen", "Select UT99 ZIP"), v -> openZipPicker());
+            Button zipButton = button(installText("Importer une archive ZIP", t("UT99-ZIP auswählen", "Select UT99 ZIP")), v -> openZipPicker());
             body.addView(zipButton);
             if (firstFocusButton == null) firstFocusButton = zipButton;
         }
 
-        Button checkButton = button(t("Erneut prüfen", "Check again"), v -> continueStartup());
+        Button checkButton = button(installText("Vérifier à nouveau", t("Erneut prüfen", "Check again")), v -> continueStartup());
+        body.addView(button(installText("Télécharger et installer GOTY (OldUnreal)",
+                "Download and install GOTY (OldUnreal)"), v -> chooseGotyLanguage()));
         body.addView(checkButton);
         if (firstFocusButton == null) firstFocusButton = checkButton;
 
@@ -395,6 +412,122 @@ public class MainActivity extends Activity {
             } catch (Throwable ignored) {
             }
         }, 80L);
+    }
+
+    private String installText(String fr, String en) {
+        return "fr".equalsIgnoreCase(getResources().getConfiguration().locale.getLanguage()) ? fr : en;
+    }
+
+    @Override public void onBackPressed() {
+        if (!installingGoty) { super.onBackPressed(); return; }
+        confirmCancelGoty();
+    }
+
+    private void confirmCancelGoty() {
+        new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setMessage(installText("Annuler l’installation en cours ?", "Cancel the current installation?"))
+                .setNegativeButton(installText("Continuer", "Continue"), null)
+                .setPositiveButton(installText("Annuler l’installation", "Cancel installation"), (dialog, which) -> {
+                    gotyInstallCancelled = true;
+                    if (gotyInstallerThread != null) gotyInstallerThread.interrupt();
+                }).show();
+    }
+
+    private void chooseGotyLanguage() {
+        final String[] codes = {"frt", "int", "det", "est", "itt", "nlt", "ptt", "rut", "elt", "ctt"};
+        final String[] names = {"Français", "English", "Deutsch", "Español", "Italiano", "Nederlands",
+                "Português", "Русский", "Ελληνικά", "繁體中文"};
+        new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle(installText("Langue du jeu", "Game language"))
+                .setItems(names, (dialog, which) -> chooseGotyVolume(codes[which]))
+                .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void chooseGotyVolume(String language) {
+        final List<File> volumes = new ArrayList<>();
+        File[] candidates = Build.VERSION.SDK_INT >= 19 ? getExternalFilesDirs(null)
+                : new File[]{getExternalFilesDir(null)};
+        if (candidates != null) for (File dir : candidates) if (dir != null) volumes.add(dir);
+        if (volumes.isEmpty()) volumes.add(getFilesDir());
+        String[] names = new String[volumes.size()];
+        for (int i = 0; i < names.length; i++) names[i] = (i == 0
+                ? installText("Stockage interne", "Internal storage")
+                : installText("Carte SD / stockage externe", "SD card / external storage"))
+                + "\n" + volumes.get(i).getAbsolutePath();
+        new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK).setTitle(installText("Emplacement d’installation", "Install location"))
+                .setItems(names, (dialog, which) -> chooseGotyFolder(volumes.get(which), language))
+                .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void chooseGotyFolder(File volume, String language) {
+        EditText name = new EditText(this); name.setSingleLine(true);
+        String proposed = "UT99-GOTY";
+        for (int index = 2; new File(volume, proposed).exists() && index < 1000; index++)
+            proposed = "UT99-GOTY-" + index;
+        name.setText(proposed);
+        AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle(installText("Nom du nouveau dossier", "New folder name"))
+                .setMessage(installText("Dossier de l’application, supprimé si elle est désinstallée. Environ 750 Mo à télécharger et 2,5 Go libres nécessaires.\n",
+                        "App folder, removed when the app is uninstalled. About 750 MB to download and 2.5 GB free required.\n") + volume.getAbsolutePath())
+                .setView(name).setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(installText("Installer", "Install"), null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String folder = name.getText().toString().trim();
+            if (folder.isEmpty() || folder.equals(".") || folder.equals("..")
+                    || folder.contains("/") || folder.contains("\\") || folder.contains(":")) {
+                name.setError(installText("Nom de dossier invalide", "Invalid folder name")); return;
+            }
+            File destination = new File(volume, folder);
+            if (destination.exists()) {
+                name.setError(installText("Ce dossier existe déjà ; choisissez un nouveau nom", "Folder already exists; choose a new name")); return;
+            }
+            dialog.dismiss(); installGoty(destination, language);
+        }));
+        dialog.show();
+    }
+
+    private void installGoty(File destination, String language) {
+        installingGoty = true;
+        gotyInstallCancelled = false;
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        showBusyScreen(installText("Installation GOTY", "GOTY installation"),
+                installText("Préparation du téléchargement officiel OldUnreal…", "Preparing official OldUnreal download…"));
+        ((LinearLayout)installProgressText.getParent()).addView(button(
+                installText("Annuler l’installation", "Cancel installation"), v -> confirmCancelGoty()));
+        gotyInstallerThread = new Thread(() -> {
+            Exception failure = null;
+            try {
+                Ut99GotyInstaller.install(new File(getCacheDir(), "oldunreal-installer"), destination, language,
+                        (phase, percent) -> {
+                            if (gotyInstallCancelled || Thread.currentThread().isInterrupted())
+                                throw new IllegalStateException("Installation cancelled");
+                            updateInstallProgress(phase, percent);
+                        });
+                UT99Paths.rememberDataRoot(this, destination);
+                UT99Paths.rememberGameLanguage(this, language);
+            } catch (Exception error) {
+                failure = error;
+                if (gotyInstallCancelled) android.util.Log.i("UT99Installer", "GOTY installation cancelled");
+                else android.util.Log.e("UT99Installer", "GOTY install failed", error);
+            }
+            final Exception error = failure;
+            runOnUiThread(() -> {
+                installingGoty = false;
+                gotyInstallerThread = null;
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if (error == null) {
+                    getIntent().removeExtra("manage_game_data");
+                    continueStartup();
+                }
+                else {
+                    lastImportMessage = gotyInstallCancelled
+                            ? installText("Installation annulée.", "Installation cancelled.")
+                            : installText("Installation interrompue : ", "Installation stopped: ") + error.getMessage();
+                    showMissingDataScreen();
+                }
+            });
+        }, "UT99-GOTY-installer");
+        gotyInstallerThread.start();
     }
 
     private void showBusyScreen(String titleText, String messageText) {

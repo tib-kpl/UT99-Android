@@ -20,6 +20,32 @@ supérieure à celle annoncée par le portage peut encore refuser la connexion.
 
 ## Données récentes
 
+### Installation depuis Android
+
+Le lanceur propose **Télécharger et installer GOTY (OldUnreal)** en complément
+du dossier personnel et de l'import ZIP. Choisir la langue du jeu, le stockage
+interne ou une microSD détectée par Android, puis le nom d'un nouveau dossier.
+La destination est dans le dossier de l'application sur le stockage choisi ;
+elle sera supprimée si l'application est désinstallée. Les dossiers existants
+ne sont pas écrasés. Le raccourci **Données du jeu**, accessible par appui long
+sur l'icône Android avec les lanceurs compatibles, permet de rouvrir ce choix.
+
+Le téléchargement utilise les sources de l'[installateur officiel OldUnreal](https://www.oldunreal.com/downloads/unrealtournament/full-game-installers/),
+vérifie l'image GOTY par taille et MD5, puis applique les données du dernier
+patch régulier publié sur leur dépôt. Les exécutables Windows ne sont ni
+installés ni exécutés. Les cartes compressées sont extraites en Java. Les
+traductions anglaises de secours sont conservées avec la langue choisie.
+La progression affiche un pourcentage par étape ; Retour ou le bouton
+d'annulation interrompt l'installation. Les archives restent en cache pour
+réessayer après une erreur et sont supprimées après réussite.
+
+Prévoir environ 750 Mo de téléchargement et 2,5 Go libres, dont environ
+750 Mo dans le stockage interne pour les archives temporaires. Une installation
+française sur microSD et une installation anglaise en stockage interne ont été
+vérifiées sur Android avec le patch 469f-rc5.
+
+### Import de ses propres fichiers
+
 Le lanceur accepte directement les données d'une installation complète récente
 ou les données v400. Les fichiers du jeu ne sont pas intégrés à l'APK.
 

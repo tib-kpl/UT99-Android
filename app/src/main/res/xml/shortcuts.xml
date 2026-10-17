@@ -1,0 +1,9 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="game_data" android:enabled="true"
+        android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/manage_game_data">
+        <intent android:action="android.intent.action.VIEW"
+            android:targetPackage="com.ast.ut99" android:targetClass="com.ast.ut99.MainActivity">
+            <extra android:name="manage_game_data" android:value="true" />
+        </intent>
+    </shortcut>
+</shortcuts>

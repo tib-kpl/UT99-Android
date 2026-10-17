@@ -27,6 +27,11 @@ public final class RedirectDownloadAudit {
         byte[] expected = selfTest ? "AB".repeat(64).getBytes("US-ASCII") : Files.readAllBytes(Paths.get(args[0]));
         byte[] compressed = selfTest ? modernUz : Files.readAllBytes(Paths.get(args[1]));
         check(Arrays.equals(expected, Ut99RedirectDownload.decodeUz(compressed, expected.length)), "UZ bytes differ");
+        check(Arrays.equals(expected, Ut99RedirectDownload.decodeDiscUz(compressed, expected.length)), "Disc UZ bytes differ");
+        try {
+            Ut99RedirectDownload.decodeDiscUz(compressed, expected.length - 1);
+            throw new AssertionError("Disc expansion limit was ignored");
+        } catch (IOException expectedFailure) { }
         // Large real packages can be checked with -Xmx256m without also
         // retaining the HTTP fixture server's buffers and concurrent jobs.
         if (args.length > 2 && "--decode-only".equals(args[2])) {

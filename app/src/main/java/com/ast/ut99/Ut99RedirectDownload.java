@@ -108,13 +108,25 @@ public final class Ut99RedirectDownload {
     // UE1 .uz: header, Huffman, optional RLE, move-to-front, BWT, RLE.
     // All reads, tree sizes, block indices and expansion sizes are bounded.
     static byte[] decodeUz(byte[] data, int expected) throws IOException {
+        if (expected < 0) throw new IOException("Invalid expected UZ size");
+        return decodeUz(data, expected, expected);
+    }
+
+    // Disc images do not provide the expanded map size. Keep a separate bounded
+    // entry point so network downloads still require an exact advertised size.
+    static byte[] decodeDiscUz(byte[] data, int maximum) throws IOException {
+        if (maximum <= 0 || maximum > LIMIT) throw new IOException("Invalid UZ limit");
+        return decodeUz(data, -1, maximum);
+    }
+
+    private static byte[] decodeUz(byte[] data, int expected, int maximum) throws IOException {
         Cursor input = new Cursor(data);
         int signature = input.integer();
         if (signature != 1234 && signature != 5678) throw new IOException("Unknown UZ format");
         int nameLength = input.compact();
         if (nameLength == Integer.MIN_VALUE || Math.abs(nameLength) > 1024) throw new IOException("Invalid UZ name");
         input.skip(Math.abs(nameLength) * (nameLength < 0 ? 2 : 1));
-        int bound = (int)Math.min(LIMIT, (long)expected * 2 + 1048576);
+        int bound = (int)Math.min(LIMIT, (long)maximum * 2 + 1048576);
         int decoded = input.integer();
         if (decoded < 0 || decoded > bound) throw new IOException("Invalid Huffman size");
         Bits bits = new Bits(input);
@@ -168,8 +180,8 @@ public final class Ut99RedirectDownload {
             }
             for (int node = first, i = 0; i < length; i++, node = next[node]) output[outputPosition++] = buffer[start + node];
         }
-        byte[] result = rle(output, expected);
-        if (result.length != expected) throw new IOException("UZ size mismatch");
+        byte[] result = rle(output, maximum);
+        if (expected >= 0 && result.length != expected) throw new IOException("UZ size mismatch");
         return result;
     }
 

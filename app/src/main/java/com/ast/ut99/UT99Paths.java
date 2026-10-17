@@ -924,16 +924,26 @@ final class UT99Paths {
         return LANGUAGE_ENGLISH;
     }
 
+    static String preferredGameLanguage(Context context, java.util.Locale locale) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("installed_game_language", gameLanguageForLocale(locale));
+    }
+
+    static void rememberGameLanguage(Context context, String language) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString("installed_game_language", language).commit();
+    }
+
     private static String resolveGameLanguage(File systemDir, String preferred) {
         // UT99_ANDROID_V221_FRENCH_LANGUAGE:
         // Only leave INT when the central menu and gameplay localizations
         // exist; individual missing keys still fall back to INT in Localize().
         // Retail files are often lower case (botpack.frt); the engine's
         // FConfigCacheIni resolves them case-insensitively on Android.
-        if (LANGUAGE_FRENCH.equals(preferred)
-                && findCaseVariant(systemDir, "UMenu.frt") != null
-                && findCaseVariant(systemDir, "Botpack.frt") != null) {
-            return LANGUAGE_FRENCH;
+        if (preferred != null && preferred.matches("ctt|det|elt|est|frt|itt|nlt|ptt|rut")
+                && findCaseVariant(systemDir, "UMenu." + preferred) != null
+                && findCaseVariant(systemDir, "Botpack." + preferred) != null) {
+            return preferred;
         }
         return LANGUAGE_ENGLISH;
     }

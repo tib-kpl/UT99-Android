@@ -181,7 +181,7 @@ public class GameActivity extends SDLActivity {
             java.util.Locale appLocale = android.os.Build.VERSION.SDK_INT >= 24
                     ? getResources().getConfiguration().getLocales().get(0)
                     : getResources().getConfiguration().locale;
-            androidIniCreatedV86 = UT99Paths.ensureAndroidIni(dataRoot, UT99Paths.gameLanguageForLocale(appLocale));
+            androidIniCreatedV86 = UT99Paths.ensureAndroidIni(dataRoot, UT99Paths.preferredGameLanguage(this, appLocale));
             if (legacySafeMode && androidIniCreatedV86) {
                 applyLegacyOuyaSafeIni(dataRoot);
             } else if (legacySafeMode) {

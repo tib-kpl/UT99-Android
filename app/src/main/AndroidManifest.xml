@@ -36,6 +36,8 @@
 
         <activity
             android:name="com.ast.ut99.MainActivity"
+            android:hardwareAccelerated="true"
+            android:enableOnBackInvokedCallback="false"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
             android:exported="true"
             android:launchMode="singleTop"
@@ -46,6 +48,7 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
                 <category android:name="tv.ouya.intent.category.GAME" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
         <activity
