@@ -682,6 +682,8 @@ static DOUBLE GUT99V169KMenuPointerVisibleUntil = 0.0; // UT99_ANDROID_V169K_TOU
 static UBOOL  GUT99V169KMenuPointerNative = 0; // UT99_ANDROID_V169K_TOUCH_IDLE_CURSOR_HIDE
 static DOUBLE GUT99V169KMenuPointerLastLog = 0.0; // UT99_ANDROID_V169K_TOUCH_IDLE_CURSOR_HIDE
 
+static UBOOL GUT99ConsoleMenuHidesPointer = 0;
+
 static void UT99AndroidMenuPointerActivityV169K( UBOOL bNativePointer, const char* Source )
 {
     // UT99_ANDROID_V169K_TOUCH_IDLE_CURSOR_HIDE:
@@ -690,7 +692,7 @@ static void UT99AndroidMenuPointerActivityV169K( UBOOL bNativePointer, const cha
     // visible/active, and that visibility expires after a short idle window.
     GUT99V169KMenuPointerVisibleUntil = appSeconds() + 3.00;
     GUT99V169KMenuPointerNative = bNativePointer ? 1 : 0;
-    if( bNativePointer )
+    if( bNativePointer && !GUT99ConsoleMenuHidesPointer )
         SDL_ShowCursor( SDL_ENABLE );
 
     DOUBLE Now = appSeconds();
@@ -4599,6 +4601,9 @@ void UNSDLViewport::AndroidNativeMouseDeltaV112( DWORD MouseFlags, INT DX, INT D
 void UNSDLViewport::AndroidUpdateNativeMouseCaptureV113( UBOOL bMenuMode )
 {
 	guard(UNSDLViewport::AndroidUpdateNativeMouseCaptureV113);
+    UObject* MenuRoot = Console ? UT99AndroidFindObjectPropertyV169E((UObject*)Console,TEXT("Root")) : NULL;
+    GUT99ConsoleMenuHidesPointer = bMenuMode && MenuRoot && MenuRoot->FindFunction(FName(TEXT("HandleStartButton")),0);
+
 	// UT99_ANDROID_NATIVE_MOUSE_RELATIVE_CAPTURE_V113
 	// v112 still used absolute Android mouse coordinates.  That made gameplay look
 	// stop at the screen edge because the visible platform cursor physically hit the
@@ -4624,7 +4629,7 @@ void UNSDLViewport::AndroidUpdateNativeMouseCaptureV113( UBOOL bMenuMode )
 			if( !GUT99V113NativeMouseCaptureActive )
 			{
 				SDL_SetWindowGrab( hWnd, SDL_FALSE );
-				SDL_ShowCursor( SDL_ENABLE );
+				SDL_ShowCursor( GUT99ConsoleMenuHidesPointer ? SDL_DISABLE : SDL_ENABLE );
 			}
 			UT99_ANDROID_SDL_LOGI( "UT99_ANDROID_CHROMEOS_CAPTURE_RESULT_V214 enabled result=%d active=%d viewport=%dx%d", RelResult, GUT99V113NativeMouseCaptureActive ? 1 : 0, SizeX, SizeY );
 		}
@@ -4633,13 +4638,14 @@ void UNSDLViewport::AndroidUpdateNativeMouseCaptureV113( UBOOL bMenuMode )
 			SDL_SetRelativeMouseMode( SDL_FALSE );
 			if( hWnd )
 				SDL_SetWindowGrab( hWnd, SDL_FALSE );
-			SDL_ShowCursor( SDL_ENABLE );
+			SDL_ShowCursor( GUT99ConsoleMenuHidesPointer ? SDL_DISABLE : SDL_ENABLE );
 			GUT99V111NativeMouseHadLast = 0;
 			for( INT i=0; i<8; ++i ) GUT99V115MenuButtonDownValid[i] = 0; // UT99_ANDROID_NATIVE_MOUSE_MENU_CLICK_STABLE_V115
 			GUT99V113NativeMouseCaptureActive = 0;
 			UT99_ANDROID_SDL_LOGI( "UT99_ANDROID_NATIVE_MOUSE_MENU_CLICK_STABLE_V115 disabled menu=%d viewport=%dx%d", bMenuMode ? 1 : 0, SizeX, SizeY );
 		}
 	}
+    if(GUT99ConsoleMenuHidesPointer) SDL_ShowCursor(SDL_DISABLE);
 	unguard;
 }
 

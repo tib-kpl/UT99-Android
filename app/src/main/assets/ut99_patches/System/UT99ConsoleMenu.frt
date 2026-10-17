@@ -14,6 +14,7 @@ HintText=HAUT/BAS : choisir   ENTREE / A : valider   ECHAP / B : retour
 CampaignText=TOURNOI / PARTIES
 
 [UT99ConsoleMatch]
+MapSettingHint="GAUCHE/DROITE : carte   ENTREE / A : liste   ECHAP / B : retour"
 EnabledText=OUI
 DisabledText=NON
 PreviewText=Voir la carte

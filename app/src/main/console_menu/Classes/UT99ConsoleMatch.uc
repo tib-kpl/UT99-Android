@@ -9,13 +9,36 @@ var UWindowComboControl Picker;
 var string SectionName;
 var UWindowEditControl InputField, EditTarget;
 var localized string EnabledText, DisabledText, EditHint;
-var localized string PreviewText, NoPreviewText, MapPickerHint;
-var int PreviewRow;
+var localized string PreviewText, NoPreviewText, MapPickerHint, MapSettingHint;
+var int PreviewRow, PickerControlRow;
 var bool bPreviewMap;
 var bool bMapPicker;
 var Texture PickerPicture;
 var string PickerMapName;
 var float PreviewHeight, PreviewLabelY;
+
+function bool IsMapControl(UWindowDialogControl Control)
+{
+    local UWindowWindow W;
+    local UMenuStartMatchClientWindow Settings;
+    local int Nest;
+    if(Control == None) return False;
+    Settings = UMenuStartMatchClientWindow(Control.NotifyWindow);
+    if(Settings != None && Settings.MapCombo == Control) return True;
+    for(W = Control.ParentWindow; W != None && Nest < 16; W = W.ParentWindow)
+    {
+        Settings = UMenuStartMatchClientWindow(W);
+        if(Settings != None && Settings.MapCombo == Control) return True;
+        Nest++;
+    }
+    return False;
+}
+
+function bool HasMapPreview()
+{
+    if(Picker != None) return bMapPicker;
+    return Row >= 0 && Row < Count-1 && IsMapControl(Controls[Row]);
+}
 
 function BeforePaint(Canvas C, float X, float Y)
 {
@@ -23,7 +46,7 @@ function BeforePaint(Canvas C, float X, float Y)
     local int SavedFirstRow;
     SavedFirstRow = FirstRow;
     Super.BeforePaint(C, X, Y);
-    if(Picker == None || !bMapPicker) return;
+    if(!HasMapPreview()) return;
     FirstRow = SavedFirstRow;
     MenuLeft = WinWidth*0.06;
     Width = WinWidth*0.42;
@@ -33,7 +56,8 @@ function BeforePaint(Canvas C, float X, float Y)
     if(Row < FirstRow) FirstRow = Row;
     if(Row >= FirstRow+VisibleRows) FirstRow = Row-VisibleRows+1;
     if(Row == Count-1) return;
-    MapName = Picker.List.GetItemValue2(Row);
+    if(Picker != None) MapName = Picker.List.GetItemValue2(Row);
+    else MapName = MatchClient.Map;
     if(MapName == PickerMapName) return;
     PickerMapName = MapName;
     MapName = Left(MapName, Len(MapName)-4);
@@ -185,7 +209,7 @@ function ActivateRow()
         Combo = Picker;
         Picker = None;
         Combo.SetSelectedIndex(Row);
-        Row = 0; FirstRow = 0;
+        Row = PickerControlRow; FirstRow = 0;
         BuildList();
         return;
     }
@@ -199,9 +223,9 @@ function ActivateRow()
     Control = Controls[Row];
     if(UWindowComboControl(Control) != None)
     {
+        PickerControlRow = Row;
         Picker = UWindowComboControl(Control);
-        bMapPicker = UMenuStartMatchClientWindow(Control.NotifyWindow) != None &&
-            Control == UMenuStartMatchClientWindow(Control.NotifyWindow).MapCombo;
+        bMapPicker = IsMapControl(Control);
         PickerMapName = ""; PickerPicture = None;
         Row = Max(0, Picker.GetSelectedIndex()); FirstRow = 0;
         BuildList();
@@ -279,7 +303,7 @@ function GoBack()
     }
     else if(Picker != None)
     {
-        Picker = None; Row = 0; FirstRow = 0; BuildList();
+        Picker = None; Row = PickerControlRow; FirstRow = 0; BuildList();
     }
     else if(SectionName != "")
     {
@@ -321,7 +345,7 @@ function Paint(Canvas C, float X, float Y)
         ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, EditHint);
         return;
     }
-    if(Picker != None && bMapPicker) { PaintMapPicker(C); return; }
+    if(HasMapPreview()) { PaintMapPicker(C); return; }
     if(!bPreviewMap) { Super.Paint(C, X, Y); return; }
     Picture = MatchClient.ScreenshotWindow.Screenshot;
     C.Style = 1;
@@ -404,8 +428,10 @@ function PaintMapPicker(Canvas C)
     TextSize(C, S, TextW, TextH);
     ClipText(C, WinWidth*0.74-TextW*0.5, WinHeight*PreviewLabelY, S);
     C.Font = Root.Fonts[F_Normal];
-    TextSize(C, MapPickerHint, TextW, TextH);
-    ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, MapPickerHint);
+    if(Picker != None) S = MapPickerHint;
+    else S = MapSettingHint;
+    TextSize(C, S, TextW, TextH);
+    ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, S);
     DrawScrollIndicator(C);
 }
 
@@ -423,6 +449,7 @@ defaultproperties
     PreviewLabelY=0.86
     PreviewText="VIEW MAP"
     NoPreviewText="This map has no preview image."
+    MapSettingHint="LEFT/RIGHT: change map   ENTER / A: map list   ESC / B: back"
     MapPickerHint="UP/DOWN: preview   ENTER / A: select   ESC / B: back"
     EditHint="ENTER: save   ESC: cancel"
     HintText="UP/DOWN: select   LEFT/RIGHT: change   ENTER / A: open   ESC / B: back"

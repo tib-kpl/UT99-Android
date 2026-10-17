@@ -17,6 +17,11 @@ var bool bIgnoreSyntheticHover;
 var localized string NetworkErrorTitle;
 var int ClientNetworkVersion;
 
+// Controller focus and touch hit testing do not require a pointer overlay.
+function DrawMouse(Canvas C)
+{
+}
+
 function SetSyntheticHover(bool bIgnore)
 {
     bIgnoreSyntheticHover = bIgnore;

@@ -71,8 +71,21 @@ function SelectMode(int Mode)
     BuildList(); FocusWindow();
 }
 
+function Finish()
+{
+    local int i;
+    for(i = 0; i < 3; i++)
+        if(ServerPages[i] != None)
+        {
+            ServerPages[i].bPingSuspend = True;
+            ServerPages[i].ShutdownFactories(False);
+        }
+    Super.Finish();
+}
+
 function Tick(float Delta)
 {
+    if(!bWindowVisible) return;
     UIClock += Delta; bActionThisTick = False;
     if(SearchProxy != None && InputField == None && SearchTerm != SearchProxy.GetValue())
     { SearchTerm = SearchProxy.GetValue(); ServerPage = 0; Row = 0; FirstRow = 0; BuildList(); }
