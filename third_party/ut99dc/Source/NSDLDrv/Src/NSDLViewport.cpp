@@ -671,24 +671,6 @@ static UBOOL UT99AndroidSetFloatPropertyV91( UObject* Obj, const TCHAR* Name, FL
     return 1;
 }
 
-static UBOOL UT99AndroidSetWindowConsoleMouseV91( FLOAT X, FLOAT Y )
-{
-    UBOOL Updated = 0;
-    for( TObjectIterator<UObject> It; It; ++It )
-    {
-        UObject* Obj = *It;
-        if( !Obj || !Obj->GetClass() )
-            continue;
-        const TCHAR* ClassName = Obj->GetClass()->GetName();
-        if( !ClassName || !appStrstr( ClassName, TEXT("WindowConsole") ) )
-            continue;
-        UBOOL A = UT99AndroidSetFloatPropertyV91( Obj, TEXT("MouseX"), X );
-        UBOOL B = UT99AndroidSetFloatPropertyV91( Obj, TEXT("MouseY"), Y );
-        Updated = Updated || (A && B);
-    }
-    return Updated;
-}
-
 static UBOOL UT99AndroidIsNativeMouseEventV110( Uint32 Which )
 {
     // UT99_ANDROID_NATIVE_MOUSE_UWINDOW_V110
@@ -824,7 +806,6 @@ static void UT99AndroidApplyNativeMouseToUWindowV110( UNSDLViewport* Viewport, I
     Viewport->bWindowsMouseAvailable = 1;
     Viewport->SelectedCursor = 0;
     GUT99V81NativePointerActive = 1;
-    UT99AndroidSetWindowConsoleMouseV91( MouseX, MouseY );
 }
 
 static void UT99AndroidMarkNativeMouseActivityV111()
@@ -2686,26 +2667,16 @@ static UObject* UT99AndroidFindObjectPropertyV169E( UObject* Obj, const TCHAR* N
     return NULL;
 }
 
-static UObject* UT99AndroidFindWindowConsoleV169E()
-{
-    for( TObjectIterator<UObject> It; It; ++It )
-    {
-        UObject* Obj = *It;
-        if( !Obj || !Obj->GetClass() )
-            continue;
-        const TCHAR* ClassName = Obj->GetClass()->GetName();
-        if( ClassName && appStrstr( ClassName, TEXT("WindowConsole") ) )
-            return Obj;
-    }
-    return NULL;
-}
+// Viewport whose console the menu helpers drive. Set while it handles input.
+static UNSDLViewport* GUT99AndroidInputViewport = NULL;
 
 static UObject* UT99AndroidFindUWindowRootV169E()
 {
-    UObject* Console = UT99AndroidFindWindowConsoleV169E();
-    if( !Console )
+    // WindowConsole.Root is the UWindow root. Looking it up through the input
+    // viewport avoids walking every loaded object on each menu input tick.
+    if( !GUT99AndroidInputViewport || !GUT99AndroidInputViewport->Console )
         return NULL;
-    return UT99AndroidFindObjectPropertyV169E( Console, TEXT("Root") );
+    return UT99AndroidFindObjectPropertyV169E( (UObject*)GUT99AndroidInputViewport->Console, TEXT("Root") );
 }
 
 static UBOOL UT99ConsoleMenuHandleStart( UNSDLViewport* Viewport )
@@ -2759,16 +2730,6 @@ static FLOAT UT99AndroidGetRootScaleV169E( UObject* Root )
     return Scale;
 }
 
-static void UT99AndroidSetWindowConsoleMouseUIV169E( FLOAT X, FLOAT Y )
-{
-    UObject* Console = UT99AndroidFindWindowConsoleV169E();
-    if( Console )
-    {
-        UT99AndroidSetFloatPropertyV91( Console, TEXT("MouseX"), X );
-        UT99AndroidSetFloatPropertyV91( Console, TEXT("MouseY"), Y );
-    }
-}
-
 static UBOOL UT99AndroidUWindowMoveMouseV169E( UNSDLViewport* Viewport, INT MouseX, INT MouseY, FLOAT* OutUIX, FLOAT* OutUIY )
 {
     // UT99_ANDROID_V169E_DIRECT_UWINDOW_TOUCH:
@@ -2787,7 +2748,6 @@ static UBOOL UT99AndroidUWindowMoveMouseV169E( UNSDLViewport* Viewport, INT Mous
     if( OutUIY ) *OutUIY = UIY;
 
     UT99AndroidMenuTouchRetargetV169B( Viewport, MouseX, MouseY );
-    UT99AndroidSetWindowConsoleMouseUIV169E( UIX, UIY );
 
     UFunction* MoveMouse = Root->FindFunction( FName(TEXT("MoveMouse"), FNAME_Find) );
     if( MoveMouse )
@@ -2839,7 +2799,6 @@ static void UT99AndroidHideOrParkMenuPointerV169K( UNSDLViewport* Viewport, UBOO
     Viewport->WindowsMouseY = ParkY;
     Viewport->SelectedCursor = 0;
     Viewport->bWindowsMouseAvailable = 1;
-    UT99AndroidSetWindowConsoleMouseV91( ParkX, ParkY );
     FLOAT UIX = 0.0f, UIY = 0.0f;
     UT99ConsoleMenuSetSyntheticHover(Viewport, 1);
     UT99AndroidUWindowMoveMouseV169E( Viewport, ParkX, ParkY, &UIX, &UIY );
@@ -3853,6 +3812,8 @@ UNSDLViewport::UNSDLViewport( ULevel* InLevel, UNSDLClient* InClient )
 void UNSDLViewport::Destroy()
 {
 	guard(UNSDLViewport::Destroy);
+	if( GUT99AndroidInputViewport == this )
+		GUT99AndroidInputViewport = NULL;
 	// Note: FullscreenViewport tracking removed - Unreal 1 specific
 	UViewport::Destroy();
 	unguard;
@@ -4708,6 +4669,7 @@ UBOOL UNSDLViewport::CauseInputEvent( INT iKey, EInputAction Action, FLOAT Delta
 UBOOL UNSDLViewport::TickInput()
 {
 	guard(UNSDLViewport::TickInput);
+	GUT99AndroidInputViewport = this;
 
 	SDL_Event Ev;
 	INT Tmp;
@@ -4752,7 +4714,6 @@ UBOOL UNSDLViewport::TickInput()
                 0.0f, (FLOAT)Max( 1, SizeX - 1 ) );
             WindowsMouseY = Clamp( OldMouseY * (FLOAT)SizeY / (FLOAT)OldSizeY,
                 0.0f, (FLOAT)Max( 1, SizeY - 1 ) );
-            UT99AndroidSetWindowConsoleMouseV91( WindowsMouseX, WindowsMouseY );
 
             // Drop coordinates and press ownership from the former resolution.
             GUT99V111NativeMouseHadLast = 0;
@@ -4910,7 +4871,6 @@ UBOOL UNSDLViewport::TickInput()
 
                     WindowsMouseX = Clamp( WindowsMouseX + DX, 0.0f, (FLOAT)Max( 1, W - 1 ) );
                     WindowsMouseY = Clamp( WindowsMouseY + DY, 0.0f, (FLOAT)Max( 1, H - 1 ) );
-                    UT99AndroidSetWindowConsoleMouseV91( WindowsMouseX, WindowsMouseY );
                     if( DX != 0.0f ) CauseInputEvent( IK_MouseX, IST_Axis, DX );
                     if( DY != 0.0f ) CauseInputEvent( IK_MouseY, IST_Axis, -DY );
 
@@ -5064,7 +5024,6 @@ while( SDL_PollEvent( &Ev ) )
                         WindowsMouseX = MouseX;
                         WindowsMouseY = MouseY;
                         bWindowsMouseAvailable = 0;
-                        UT99AndroidSetWindowConsoleMouseV91( MouseX, MouseY );
                         if( Client && Client->Engine )
                             Client->Engine->MousePosition( this, 0, MouseX, MouseY );
                         CauseInputEvent( MouseButtonMap[Ev.button.button], ( Ev.type == SDL_MOUSEBUTTONDOWN ) ? IST_Press : IST_Release );
@@ -5526,7 +5485,6 @@ while( SDL_PollEvent( &Ev ) )
                 WindowsMouseX = MouseX;
                 WindowsMouseY = MouseY;
                 bWindowsMouseAvailable = 1;
-                UT99AndroidSetWindowConsoleMouseV91( MouseX, MouseY );
                 if( Client && Client->Engine )
                 {
                     Client->Engine->MousePosition( this, MOUSE_Left, MouseX, MouseY );

@@ -773,6 +773,14 @@ void UGameEngine::Init()
 		if( Audio )
 			Audio->SetViewport( Viewport );
 	}
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+	// Read every System .int/.frt registry entry now, while the intro has not
+	// started, instead of when the first menu asks for mutators or weapons.
+	{
+		TArray<FRegistryObjectInfo> Unused;
+		UObject::GetRegistryObjects( Unused, UClass::StaticClass(), UObject::StaticClass(), 0 );
+	}
+#endif
 	debugf( NAME_Init, TEXT("Game engine initialized") );
 
 	unguard;
