@@ -13,10 +13,10 @@
 // Engine build number, for displaying to end users.
 #define ENGINE_VERSION 400
 
-// Android clients can negotiate the classic 432 wire protocol. This is
+// Android clients advertise 436 so servers with MinNetVersion=436 accept them. This is
 // independent of native package layouts, file version and listen-server build.
 #if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
-#define ENGINE_CLIENT_NETWORK_VERSION 432
+#define ENGINE_CLIENT_NETWORK_VERSION 436
 #else
 #define ENGINE_CLIENT_NETWORK_VERSION ENGINE_VERSION
 #endif

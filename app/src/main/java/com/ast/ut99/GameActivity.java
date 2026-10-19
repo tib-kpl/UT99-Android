@@ -150,6 +150,7 @@ public class GameActivity extends SDLActivity {
         ut99V166ResolutionMode = ut99V166ReadResolutionMode();
 
         applyUt99ImmersiveMode();
+        ut99ShowOverInsecureKeyguard();
         sUt99ImeWanted = false;
         ut99V76HideImeUnlessRequested();
 
@@ -1716,6 +1717,8 @@ public class GameActivity extends SDLActivity {
     // buttons/axes from remaining latched when AAOS switches away from the game.
     @Override
     protected void onPause() {
+        // The lock mode may have changed while playing; refresh it before sleep.
+        ut99ShowOverInsecureKeyguard();
         try {
             if (ut99RetroTouchBridge != null) {
                 ut99RetroTouchBridge.pause();
@@ -1745,8 +1748,34 @@ public class GameActivity extends SDLActivity {
         super.onPause();
     }
 
+    /**
+     * A swipe-only lock screen keeps input focus after waking the device, so the
+     * first gamepad presses never reach the menu. Without a PIN/pattern there is
+     * nothing to protect: show the game over it and dismiss it. A secure lock
+     * screen keeps the normal Android behaviour.
+     */
+    private void ut99ShowOverInsecureKeyguard() {
+        try {
+            android.app.KeyguardManager km =
+                    (android.app.KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+            boolean insecure = km != null && !km.isKeyguardSecure();
+            if (android.os.Build.VERSION.SDK_INT >= 27) {
+                setShowWhenLocked(insecure);
+                if (insecure && km.isKeyguardLocked()) km.requestDismissKeyguard(this, null);
+            } else {
+                int flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                        | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD;
+                if (insecure) getWindow().addFlags(flags);
+                else getWindow().clearFlags(flags);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Lock screen handling failed", t);
+        }
+    }
+
     @Override
     protected void onResume() {
+        ut99ShowOverInsecureKeyguard();
         if (isAutomotiveDevice()) {
             // Let SDL restore the native thread/audio/GL state first on AAOS.
             super.onResume();

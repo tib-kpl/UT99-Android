@@ -216,12 +216,16 @@ la redirection HTTP, les entrées tronquées, mille flux malformés, le code 404
 la taille incorrecte et l'annulation. Aucun fichier du jeu n'est livré avec
 ce test.
 
-Les clients Android négocient désormais jusqu'au protocole classique 432,
+Les clients Android négocient jusqu'au protocole 436 (432 avant la 2.3.5),
 indépendamment de la version 400 du moteur et de ses packages système. Un
 serveur v400 peut toujours négocier 400. Le navigateur LAN/Internet utilise
 cette capacité réseau pour décider si le bouton de connexion est disponible.
 Cela ne signifie pas que tous les mods et protections de serveurs 469 sont
 compatibles avec le port Android.
+
+Annoncer 436 permet de rejoindre les serveurs configurés avec
+`MinNetVersion=436`, qui refusaient le client en 432 (« UT REQUIS 436 »).
+Les serveurs qui exigent 469 restent inaccessibles depuis Android.
 
 L'audit ci-dessous charge chaque carte et exporte son niveau avec le moteur
 v400 dans une copie isolée. Cela vérifie les références et le chargement,

@@ -172,7 +172,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("host", help="Server under your control")
     parser.add_argument("--port", type=int, default=7777)
-    parser.add_argument("--version", type=int, choices=(400, 432), default=400)
+    parser.add_argument("--version", type=int, choices=(400, 432, 436), default=400)
     parser.add_argument("--timeout", type=float, default=5)
     parser.add_argument("--output")
     args = parser.parse_args()
