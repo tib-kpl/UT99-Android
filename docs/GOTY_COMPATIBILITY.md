@@ -511,3 +511,24 @@ du paquet anglais quand la langue du jeu correspond ; l'installateur les
 supprimait jusqu'ici. Il conserve maintenant ceux de la langue choisie. Une
 installation GOTY faite avec une version précédente doit être refaite pour
 obtenir ces voix.
+
+### Correctifs 2.3.4 à 2.3.11
+
+- **Contacts en partie (2.3.4)** : avec les données 469, `Touching` est un
+  tableau dynamique. Un premier contact peut détruire l'un des deux acteurs
+  pendant le même déplacement ; `TouchTo` vérifie désormais que les deux
+  acteurs existent encore avant et après `Touch`. Cela corrige le plantage
+  de la première carte de la campagne (DM-Oblivion) quand un bot touche ou
+  blesse le joueur.
+- **Version réseau (2.3.5)** : le client annonce 436 au lieu de 432 et rejoint
+  les serveurs configurés avec `MinNetVersion=436`.
+- **Ouverture du menu (2.3.6, 2.3.8)** : les assistants de menu ne parcourent
+  plus tous les objets chargés à chaque entrée ; les fichiers `.int`/`.frt`
+  (314 avec 469, contre 123 avec v400) sont lus au démarrage du moteur ;
+  `GetMapName` réutilise pendant deux secondes la liste des cartes au lieu de
+  relire le dossier Maps pour chaque carte, ce qui était très lent sur microSD.
+- **Navigateur de serveurs (2.3.9)** : la fenêtre d'informations sans titre
+  qu'un onglet 469 affiche à sa création est masquée au lieu de devenir une
+  page vide du menu console.
+
+Le détail des versions est dans [CHANGELOG.md](../CHANGELOG.md).

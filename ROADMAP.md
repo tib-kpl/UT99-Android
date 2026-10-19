@@ -1,27 +1,48 @@
-# UT99-Android TODO / Roadmap
+# UT99-Android : feuille de route
 
-## Core Engine
+## Moteur
 
-- [x] UT99 running on Android
-- [x] Android 4.1.2+ (OUYA) support
-- [x] OpenGL ES 2.0 renderer
-- [x] Local WiFi multiplayer (sort of)
-- [x] ZIP / folder game data import
-- [x] Android SAF storage support
+- [x] UT99 sur Android (moteur natif v400)
+- [x] Android 4.1.2+ (OUYA) jusqu'à Android 16
+- [x] Builds 32 et 64 bits (armeabi-v7a, arm64-v8a)
+- [x] Rendu OpenGL ES
+- [x] Chargement des paquets système OldUnreal 469f
+- [ ] Mods et protections de serveurs 469 récents (au cas par cas)
 
-## Graphics & Rendering
+## Données du jeu
 
-- [x] Dynamic resolution scaling
-- [x] Optional scaling for lower spec-devices
-- [x] Additional FoV toggle
+- [x] Import d'un dossier ou d'un ZIP
+- [x] Accès au stockage Android moderne (SAF)
+- [x] Installation des données GOTY officielles depuis l'app, avec choix de la langue
+- [x] Voix localisées du disque GOTY (français, espagnol, italien)
+- [x] Installation dans un dossier au choix, ou utilisation sur place d'un jeu existant
 
-## Controls & Input
+## Menus et interface
 
-- [x] Android gamepad support
-- [x] OUYA controller support
-- [x] Add Android mouse support
-- [x] Touchscreen overlay
+- [x] Menu console/téléphone pour la manette (variante `console-menu`)
+- [x] Menu UT99 d'origine (variante `classic-menu`)
+- [x] Réglages Android en jeu : manette tactile, langue, emplacement des données
+- [x] Saisie de texte visible au-dessus du clavier Android
+- [x] Champs et boutons au style du menu console
+- [ ] Mêmes améliorations de saisie pour le menu classique
 
-## Not planned / not in the scope of this project
+## Graphismes
 
-- [x] Full 64-bit gameplay parity with 32-bit build
+- [x] Mise à l'échelle dynamique de la résolution
+- [x] Mise à l'échelle optionnelle pour les appareils modestes
+- [x] Réglage du champ de vision
+- [ ] Rendu Vulkan / pilotes personnalisés comme Turnip (à évaluer)
+
+## Commandes
+
+- [x] Manettes Android et OUYA
+- [x] Souris et clavier
+- [x] Manette tactile RetroTouch (opacité et disposition réglables)
+
+## Multijoueur
+
+- [x] Parties LAN
+- [x] Parties Internet via le navigateur de serveurs
+- [x] Serveurs 432 et 436
+- [ ] Serveurs qui exigent un client 469
+- [ ] Discussion en partie sans clavier physique

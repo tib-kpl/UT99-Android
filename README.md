@@ -1,59 +1,44 @@
-<img width="2172" height="724" alt="image" src="https://github.com/Andiweli/UT99-Android/blob/master/images/unreal-header.jpg" />
+<img width="2172" height="724" alt="Unreal Tournament" src="https://github.com/Andiweli/UT99-Android/blob/master/images/unreal-header.jpg" />
 
-# Unreal Tournament (UT99) Android
+# Unreal Tournament (UT99) pour Android
 
-Les développements de ce fork sont réunis dans `master`. Chaque
-[release de ce dépôt](https://github.com/tib-kpl/UT99-Android/releases/latest)
-propose deux APK signés : **classic-menu** pour le menu UT99 classique et
-**console-menu** pour le menu console/téléphone. Les deux partagent le même
-moteur, les mêmes correctifs et les mêmes données ; installer une variante
-remplace l'autre en conservant les données. La prise en charge des fichiers
-OldUnreal reste partielle : voir [la compatibilité GOTY](docs/GOTY_COMPATIBILITY.md).
-
-> [!NOTE]
-> **Fork pour la traduction française** de [Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android).
-> - Le jeu passe en français quand l'app est en français (langue du téléphone, ou réglage de langue par app sous Android 13+).
-> - Il utilise la traduction officielle (`.frt`) présente dans les données du jeu ; le moteur trouve aussi les fichiers en minuscules (`botpack.frt`…).
-> - Les liens de téléchargement plus bas mènent aux versions officielles, sans ces changements.
->
-> **Fork for the French translation** of [Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android).
-> The game plays in French when the app's language is French (device language, or the per-app language setting on Android 13+),
-> with the official French localization (`.frt`) of the game data; the engine also finds lower-case file names.
-> The download links below lead to the upstream builds, without these changes.
+Portage non officiel d'Unreal Tournament (1999) sur Android, à partir du port
+d'[Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android). Ce fork
+ajoute la traduction française, l'installation des données GOTY officielles, la
+prise en charge des fichiers OldUnreal 469 et un menu pensé pour la manette.
 
 <p align="left">
-  <a href="README.md">README</a>
+  <a href="https://github.com/tib-kpl/UT99-Android/releases/latest"><b>TÉLÉCHARGER</b></a>
   &nbsp;|&nbsp;
-  <a href="ROADMAP.md">ROADMAP</a>
+  <a href="CHANGELOG.md">Historique des versions</a>
   &nbsp;|&nbsp;
-  <a href="https://github.com/Andiweli/UT99-Android/releases">DOWNLOAD</a>
+  <a href="docs/GOTY_COMPATIBILITY.md">Compatibilité GOTY / OldUnreal</a>
+  &nbsp;|&nbsp;
+  <a href="docs/CONSOLE_MENU.md">Menu console</a>
 </p>
 
-![OS](https://img.shields.io/badge/up%20to-Android%2016-green)
-![Architecture](https://img.shields.io/badge/architecture-32/64bit-orange.svg)
+![OS](https://img.shields.io/badge/Android-4.1%20%C3%A0%2016-green)
+![Architecture](https://img.shields.io/badge/ABI-armeabi--v7a%20%2F%20arm64--v8a-orange.svg)
+![Controller](https://img.shields.io/badge/Contr%C3%B4les-Manette%20%2F%20Tactile%20%2F%20Clavier-blueviolet)
+![Multiplayer](https://img.shields.io/badge/Multijoueur-LAN%20%2B%20Internet%20(436)-blueviolet)
 ![AI](https://img.shields.io/badge/AI-assisted%20coding-6e7781)
-![Controller](https://img.shields.io/badge/Controls-Gamepad/Touch/Keyb-blueviolet)
-![Multiplayer](https://img.shields.io/badge/Multiplayer-local%20WiFi-blueviolet)
-[![Support via PayPal](https://img.shields.io/badge/Support%20via-PayPal-0070BA?logo=paypal\&logoColor=white)](https://paypal.me/andiweli)
-
 
 > [!NOTE]
-> Unofficial fan port.  
-> No game data included.  
-> Several bugs with triggers and events not starting 100%.  
-> Requires legally obtained Unreal Tournament v1.400 game files.  
-> This project is not official and is not endorsed by Epic Games.
+> **English summary.** Unofficial Android port of Unreal Tournament (1999), forked from
+> Andiweli/UT99-Android. This fork adds the French localization, an in-app installer for the
+> official GOTY data (GOTY disc + latest OldUnreal patch, data files only), Android-side fixes for
+> OldUnreal 469 data, an in-game Android settings screen and a controller-first console menu.
+> Each [release](https://github.com/tib-kpl/UT99-Android/releases/latest) ships two signed APKs:
+> `console-menu` and `classic-menu`. No game data is included.
 
 > [!IMPORTANT]
-> Video games on smartphones are great, but not user-friendly if they require more than two thumbs to control. For this reason, this port is designed for controller input only and does only offer basic touchscreen controls.
->
-> This project is for preservation, experimentation and personal use only.  
-> Unreal Tournament, Unreal Engine and related trademarks are owned by Epic Games.  
-> This project is not affiliated with or endorsed by Epic Games.
+> Aucune donnée du jeu n'est incluse. Il faut une copie légale d'Unreal Tournament.
+> Ce projet n'est ni officiel ni approuvé par Epic Games. Unreal Tournament,
+> Unreal Engine et les marques associées appartiennent à Epic Games.
 
 ---
 
-## ▣ Screenshots
+## ▣ Captures
 
 <img width="1920" height="1080" alt="ut99-0" src="https://github.com/user-attachments/assets/e7b74300-e685-47fb-82f8-4a81405855e2" />
 <img width="1920" height="1080" alt="ut99-1" src="https://github.com/user-attachments/assets/81ffadd5-bf30-4444-ab3b-698c4e56430f" />
@@ -61,30 +46,89 @@ OldUnreal reste partielle : voir [la compatibilité GOTY](docs/GOTY_COMPATIBILIT
 
 ---
 
-## ◈ Features
+## ◈ Deux variantes, un seul moteur
 
-- Android support Android 4.x (OUYA) up to Android 16
-- Improved Game Data Import – Unreal Tournament data can be imported via folder or ZIP selection and automatically installs to the app's data folder
-- Android Storage Access Fixed – SAF support added for modern Android versions where direct SD/file access is restricted
-- Legacy storage behavior friendly for old sideload devices (place game data on your microSD/UT99 folder)
-- Local WiFi multiplayer and botmatches are available
-- Added touch controls featuring *RetroTouch* for use without a controller
-- Added keyboard support (tested with Chromebook)
+Chaque release contient deux APK signés, construits depuis la même branche
+`master` :
 
-> [!NOTE]
-> Expect occasional issues, especially on very old Android devices or unusual controller mappings.
+| APK | Menu |
+|---|---|
+| `…-console-menu-release.apk` | Menu console/téléphone : grandes options, navigation à la croix, aperçus de cartes, champs adaptés au clavier Android. Recommandé à la manette. |
+| `…-classic-menu-release.apk` | Menu UT99 d'origine (fenêtres UWindow). |
+
+Les deux partagent le même moteur natif, les mêmes correctifs et les mêmes
+données. Installer une variante remplace l'autre en conservant les données et
+les réglages.
 
 ---
 
-## ▣ Requirements
+## ◈ Fonctionnalités
 
-- Android device with OpenGL ES 2.0 support.
-- Android 4.1 / API 16 or newer.
-- A compatible device.
-- Android-compatible game controller recommended.
-- Original Unreal Tournament / UT99 PC game data: v400 or a complete GOTY/OldUnreal installation. See [compatibility and limitations](docs/GOTY_COMPATIBILITY.md).
+**Données du jeu**
+- **Installation GOTY officielle depuis l'app** : téléchargement du disque GOTY
+  (miroirs OldUnreal ou archive.org, somme MD5 vérifiée) et du dernier patch
+  OldUnreal. Seuls les fichiers de données sont gardés : aucun `.exe` ni `.dll`.
+- Choix de la langue à l'installation : anglais, français, allemand, espagnol,
+  italien, néerlandais, portugais, russe, chinois, grec. Les voix localisées
+  du disque (français, espagnol, italien) sont conservées pour la langue choisie.
+- Import de ses propres fichiers (dossier ou ZIP), versions v400 ou 469.
+- Stockage au choix : mémoire interne, carte microSD ou **n'importe quel
+  dossier**. Un dossier qui contient déjà un jeu valide peut être utilisé sur
+  place, sans copie.
 
-Required game data folders:
+**Réglages Android en jeu** (rouage en haut à droite)
+- Manette tactile : « Automatique (sans manette physique) », « Toujours
+  afficher » ou « Masquer » ; opacité réglable de 20 à 100 % ; modification et
+  réinitialisation de la disposition.
+- Langue du jeu (redémarrage automatique).
+- Emplacement des données du jeu.
+
+**Commandes**
+- Manettes Android (Xbox, consoles portables AYN, Retroid, OUYA…).
+- Manette tactile *RetroTouch* pour jouer sans manette.
+- Clavier et souris (testé sur Chromebook).
+
+**Multijoueur**
+- Parties LAN et parties Internet via le navigateur de serveurs.
+- Le client annonce la version réseau 436 : il rejoint les serveurs 432 et 436
+  (et les serveurs 469 qui acceptent les clients 436).
+- Rejoindre par adresse IP, téléchargement des paquets manquants depuis le
+  serveur.
+
+**Localisation**
+- Le jeu passe en français quand l'app est en français (langue du téléphone, ou
+  langue par application sous Android 13+), avec la traduction officielle
+  (`.frt`). Textes UTF-8 des fichiers 469 correctement décodés.
+
+**Compatibilité OldUnreal 469**
+- Le moteur Android est une base v400 qui charge aussi les paquets système 469f.
+  Les correctifs (chargement de cartes, sons d'interface, paramètres de script
+  récents, réseau…) sont détaillés dans
+  [docs/GOTY_COMPATIBILITY.md](docs/GOTY_COMPATIBILITY.md).
+
+> [!NOTE]
+> Limites connues : certains mods et protections de serveurs (anti-triche, mods
+> récents) ne fonctionnent pas ; les serveurs qui exigent 469 restent
+> inaccessibles ; certains déclencheurs et événements de cartes peuvent encore
+> mal se lancer. Le rendu utilise OpenGL ES (pas de Vulkan).
+
+---
+
+## ◎ Installation
+
+1. Téléchargez et installez l'APK de votre choix depuis
+   [la dernière release](https://github.com/tib-kpl/UT99-Android/releases/latest).
+2. Lancez **Unreal Tournament**.
+3. Si aucune donnée n'est trouvée, l'écran d'installation propose :
+   - **Télécharger et installer GOTY (OldUnreal)** : choix de la langue et de
+     l'emplacement, puis téléchargement du disque GOTY (environ 650 Mo) et du
+     patch OldUnreal ;
+   - **Choisir mon dossier UT99** ou **Importer une archive ZIP** pour vos
+     propres fichiers. Si le dossier choisi contient déjà un jeu valide,
+     **Utiliser ce dossier** le garde sur place, sans copie.
+4. Le jeu démarre automatiquement une fois les données en place.
+
+Dossiers requis pour un import manuel :
 
 ```text
 UnrealTournament/
@@ -95,127 +139,77 @@ UnrealTournament/
 └── Music/
 ```
 
-The installer accepts the folders either directly at the selected root or inside one top-level Unreal Tournament folder.
+Les dossiers peuvent être à la racine choisie ou dans un unique dossier
+Unreal Tournament.
 
 ---
 
-## ◎ Installation
+## ◇ Disposition par défaut de la manette
 
-1. Install the APK on your Android device.
-2. Copy your Unreal Tournament game data to your device, either:
-   - as an extracted folder, or
-   - as a ZIP file.
-3. Start **Unreal Tournament**.
-4. If no game data is found, the installer screen appears.
-5. Choose one of the following:
-   - **Select UT99 folder**
-   - **Select UT99 ZIP**
-6. Wait until the import is finished.
-7. The game starts automatically once the required data is found.
-
-The app installs the game data into its private Android data folder.
-
----
-
-## ◇ Default controller layout
-
-The default controller mapping is designed for Android gamepads, OUYA and handheld devices such as Retroid-style controllers.
-
-| Control | Action |
+| Commande | Action |
 |---|---|
-| Left Stick | Move forward / backward / strafe |
-| Right Stick | Look / turn |
-| Left Trigger | Alternate Fire |
-| Right Trigger | Fire |
-| Left Shoulder | Previous Weapon |
-| Right Shoulder | Next Weapon |
-| A / right face button | Jump |
-| B / bottom face button / OUYA O | Crouch |
-| Y / left face button / OUYA U | Walk |
-| X / top face button / OUYA Y | Wave |
-| D-Pad | Menu navigation / in-game navigation depending on context |
+| Stick gauche | Avancer / reculer / pas de côté |
+| Stick droit | Regarder / tourner |
+| Gâchette gauche | Tir secondaire |
+| Gâchette droite | Tir principal |
+| Bouton épaule gauche | Arme précédente |
+| Bouton épaule droit | Arme suivante |
+| A / bouton de droite | Sauter |
+| B / bouton du bas / OUYA O | S'accroupir |
+| Y / bouton de gauche / OUYA U | Marcher |
+| X / bouton du haut / OUYA Y | Saluer |
+| Croix directionnelle | Navigation dans les menus / en jeu selon le contexte |
 | Start | Pause / menu |
-| Back | Back / cancel depending on context |
+| Back | Retour / annuler selon le contexte |
 
 > [!NOTE]
-> Button names can differ between Android controllers.  
-> If movement or looking feels wrong, open the in-game controls menu and reassign the affected controls.
+> Les noms des boutons varient selon les manettes. Les commandes se
+> réassignent dans le menu des contrôles du jeu.
 
 ---
 
-## ▣ Game data notes
+## ◈ Compilation
 
-Game data is not bundled with this repository.
-
-You need to provide your own legal copy of Unreal Tournament / UT99.  
-The Android installer checks for the required folders:
+Prérequis : JDK 17, Android SDK 35, NDK 23.2.8568313, CMake 3.22.1.
+Le projet utilise Android Gradle Plugin 8.6.1 et Gradle 8.7.
 
 ```text
-System
-Maps
-Textures
-Sounds
-Music
+./gradlew assembleNormalRelease assembleClassicRelease
+python tools/check_menu_variants.py
 ```
 
-If these folders are missing, the game will not start and the installer screen will ask you to select a valid folder or ZIP file.
+`normal` produit le menu console et `classic` le menu UT99 d'origine.
+`tools/check_menu_variants.py` vérifie que les deux APK partagent les mêmes
+bibliothèques natives, ressources, assets et manifeste. Le menu console
+(`UT99ConsoleMenu.u`) se recompile avec `tools/build_console_menu.ps1` et un
+UCC v400. Voir aussi [BUILD-FLAVORS.md](BUILD-FLAVORS.md).
+
+| | |
+|---|---|
+| Identifiant | `com.ast.ut99` |
+| SDK minimum | 16 (Android 4.1) |
+| SDK cible | 35 |
+| ABI | armeabi-v7a, arm64-v8a |
+| Rendu | OpenGL ES |
+
+Chaque commit sur `master` est compilé par GitHub Actions, qui signe les deux
+APK et publie une release.
 
 ---
 
-## ◈ Building from source
+## ▣ Crédits
 
-This project is intended to be built with Android Studio.
-
-General setup:
-
-1. Clone the repository.
-2. Open the project in Android Studio.
-3. Make sure the Android SDK 2022, NDK 23.1.7779620 and CMake 3.22.1 are installed.
-4. Fetch or provide required third-party dependencies such as SDL2 if they are not already present (now included for all those asking AI).
-5. Build the `app` module.
-
-Current Android build characteristics:
-
-```text
-Application ID: com.ast.ut99
-Minimum SDK:   16
-Target SDK:    28
-Compile SDK:   33
-ABI:           armeabi-v7a
-Renderer:      OpenGL ES 2.0
-```
+- Port Android d'origine : [Andiweli/UT99-Android](https://github.com/Andiweli/UT99-Android)
+  ([soutenir Andiweli via PayPal](https://paypal.me/andiweli)).
+- [OldUnreal](https://www.oldunreal.com/) pour le patch 469 et l'hébergement
+  des données GOTY.
+- La communauté de préservation et de portage d'Unreal Engine 1.
 
 ---
 
-## ▣ Credits
+## ◎ Mentions légales
 
-This Android port is based on Unreal Engine 1 / Unreal Tournament source code work and SDL/OpenGL ES based mobile porting efforts.
-
-Special thanks to the Unreal Engine 1 preservation and porting community.
-
----
-
-## ❤️ Support
-
-If you enjoy this project and would like to support my work, you can make a small contribution via PayPal.
-
-Your support helps me spend more time maintaining existing projects, fixing bugs, improving compatibility, and working on new features.
-
-[![Support via PayPal](https://img.shields.io/badge/Support%20via-PayPal-0070BA?logo=paypal\&logoColor=white)](https://paypal.me/andiweli)
-
-Thank you for your support!
-
----
-
-## ◎ Legal
-
-Unreal Tournament, Unreal Engine and related names, assets and trademarks are property of Epic Games.
-Portions of the materials used are trademarks and/or copyrighted works of Epic Games, Inc.
-
-This repository does **not** include commercial game data.  
-You must own a legal copy of Unreal Tournament / UT99 to use this port.
-This material is not official and is not endorsed by Epic.
-
-All rights reserved by Epic.
-
-Do not use this project for commercial purposes.
+Unreal Tournament, Unreal Engine et les noms, ressources et marques associés
+sont la propriété d'Epic Games. Ce dépôt n'inclut **aucune** donnée commerciale
+du jeu ; une copie légale d'Unreal Tournament est nécessaire. Ce projet n'est ni
+officiel ni approuvé par Epic Games. Usage non commercial uniquement.
