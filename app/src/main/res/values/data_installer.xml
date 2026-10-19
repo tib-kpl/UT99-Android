@@ -1,3 +1,5 @@
 <resources>
     <string name="manage_game_data">Game data</string>
+    <string name="android_settings">Android settings</string>
+    <string name="touch_layout_hidden">The on-screen controller is hidden. Set it to \"Always show\" in the Android settings to edit it.</string>
 </resources>

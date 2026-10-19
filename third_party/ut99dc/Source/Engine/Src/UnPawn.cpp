@@ -179,6 +179,63 @@ static UBOOL UT99ValidCacheGuid(const FString& Guid)
     return 1;
 }
 
+// OldUnreal 469 Actor.AddToPackageMap/IsInPackageMap (natives 1718/1719).
+// Mutators with bAddToPackageMap call AddToPackageMap from PreBeginPlay,
+// often before the server net driver exists, so remember those packages
+// until UGameEngine::BuildServerMasterMap adds them for download.
+TArray<FString> GUT99ExtraServerPackages;
+
+static FString UT99ActorPackageName(AActor* Actor, const FString& Requested)
+{
+    if(Requested.Len()) return Requested;
+    UObject* Package=Actor->GetClass();
+    while(Package->GetOuter()) Package=Package->GetOuter();
+    return Package->GetName();
+}
+
+void AActor::execAddToPackageMap(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR_OPTX(PackageName,TEXT(""));
+    P_FINISH;
+    FString Name=UT99ActorPackageName(this,PackageName);
+    *(UBOOL*)Result=0;
+    UNetDriver* Driver=GetLevel()->NetDriver;
+    if(Driver && Driver->MasterMap && !Driver->ServerConnection)
+    {
+        ULinkerLoad* Linker=GetPackageLinker(NULL,*Name,LOAD_NoWarn,NULL,NULL);
+        if(Linker && Driver->MasterMap->AddLinker(Linker)!=INDEX_NONE)
+        {
+            Driver->MasterMap->Compute();
+            *(UBOOL*)Result=1;
+        }
+    }
+    else if(!Driver || !Driver->ServerConnection)
+    {
+        for(INT i=0;i<GUT99ExtraServerPackages.Num();++i)
+            if(!appStricmp(*GUT99ExtraServerPackages(i),*Name)) { *(UBOOL*)Result=1; return; }
+        GUT99ExtraServerPackages.AddItem(Name);
+        *(UBOOL*)Result=1;
+    }
+}
+IMPLEMENT_FUNCTION(AActor,1718,execAddToPackageMap);
+
+void AActor::execIsInPackageMap(FFrame& Stack, RESULT_DECL)
+{
+    P_GET_STR_OPTX(PackageName,TEXT(""));
+    P_GET_UBOOL_OPTX(bServerPackagesOnly,0);
+    P_FINISH;
+    FString Name=UT99ActorPackageName(this,PackageName);
+    *(UBOOL*)Result=0;
+    UNetDriver* Driver=GetLevel()->NetDriver;
+    UPackageMap* Map=Driver ? (Driver->ServerConnection ? Driver->ServerConnection->PackageMap : Driver->MasterMap) : NULL;
+    if(Map)
+        for(INT i=0;i<Map->List.Num();++i)
+            if(Map->List(i).Parent && !appStricmp(Map->List(i).Parent->GetName(),*Name)) { *(UBOOL*)Result=1; return; }
+    for(INT i=0;i<GUT99ExtraServerPackages.Num();++i)
+        if(!appStricmp(*GUT99ExtraServerPackages(i),*Name)) { *(UBOOL*)Result=1; return; }
+}
+IMPLEMENT_FUNCTION(AActor,1719,execIsInPackageMap);
+
 void AActor::execGetCacheEntry(FFrame& Stack, RESULT_DECL)
 {
     P_GET_INT(Num);

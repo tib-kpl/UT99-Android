@@ -3826,6 +3826,11 @@ IMPLEMENT_FUNCTION( UObject, INDEX_NONE, execStaticSaveConfig);
 void UObject::execResetConfig( FFrame& Stack, RESULT_DECL )
 {
 	guard(UObject::execResetConfig);
+	// OldUnreal 469 added "optional string PropName"; retail bytecode has no
+	// argument. Consume it when present so the script stack stays aligned.
+	FString PropName;
+	if( *Stack.Code != EX_EndFunctionParms )
+		Stack.Step( Stack.Object, &PropName );
 	P_FINISH;
 	ResetConfig(GetClass());
 	unguard;

@@ -632,6 +632,16 @@ void UGameEngine::BuildServerMasterMap( UNetDriver* NetDriver, ULevel* InLevel )
 		check(InLevel->GetLevelInfo()->Game->GetClass()->GetLinker());
 		NetDriver->MasterMap->AddLinker( InLevel->GetLevelInfo()->Game->GetClass()->GetLinker() );
 
+		// Packages requested by OldUnreal 469 Actor.AddToPackageMap before the
+		// net driver existed (see UnPawn.cpp).
+		extern TArray<FString> GUT99ExtraServerPackages;
+		for( INT i=0; i<GUT99ExtraServerPackages.Num(); i++ )
+		{
+			ULinkerLoad* Linker = GetPackageLinker( NULL, *GUT99ExtraServerPackages(i), LOAD_NoWarn, NULL, NULL );
+			if( Linker )
+				NetDriver->MasterMap->AddLinker( Linker );
+		}
+
 		// Precompute linker info.
 		NetDriver->MasterMap->Compute();
 	}
@@ -1240,6 +1250,8 @@ ULevel* UGameEngine::LoadMap( const FURL& URL, UPendingLevel* Pending, const TMa
 	Error = TEXT("");
 	debugf( NAME_Log, TEXT("LoadMap: %s"), *URL.String() );
 	GInitRunaway();
+	extern TArray<FString> GUT99ExtraServerPackages;
+	GUT99ExtraServerPackages.Empty();
 
 	// Remember current level's stack level.
 	INT SavedHubStackLevel = GLevel ? GLevel->GetLevelInfo()->HubStackLevel : 0;

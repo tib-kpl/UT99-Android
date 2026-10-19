@@ -154,4 +154,15 @@ class DLL_EXPORT_CLASS UGenericAudioSubsystem : public UAudioSubsystem
 	{
 		return Volume * (1.0 - (Location - (Viewport->Actor->ViewTarget?Viewport->Actor->ViewTarget:Viewport->Actor)->Location).Size()/Radius);
 	}
+	// OldUnreal 469 plays interface sounds (announcer, CityIntro narration)
+	// unattenuated and unspatialized from an AnnouncerSpectator that is not
+	// near the listener, so they must not lose priority with distance.
+	static UBOOL IsInterfaceSound( INT Id )
+	{
+		return (Id&14)==SLOT_Interface*2;
+	}
+	FLOAT SoundPriority( UViewport* Viewport, INT Id, FVector Location, FLOAT Volume, FLOAT Radius )
+	{
+		return IsInterfaceSound(Id) ? Volume : SoundPriority( Viewport, Location, Volume, Radius );
+	}
 };

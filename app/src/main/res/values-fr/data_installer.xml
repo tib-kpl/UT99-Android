@@ -1,3 +1,5 @@
 <resources>
     <string name="manage_game_data">Données du jeu</string>
+    <string name="android_settings">Réglages Android</string>
+    <string name="touch_layout_hidden">La manette tactile est masquée. Choisissez « Toujours afficher » dans les réglages Android pour la modifier.</string>
 </resources>

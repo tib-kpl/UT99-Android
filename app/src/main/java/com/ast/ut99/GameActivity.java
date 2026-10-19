@@ -118,6 +118,7 @@ public class GameActivity extends SDLActivity {
     private File homeDir;
     private boolean legacySafeMode;
     private Ut99RetroTouchBridge ut99RetroTouchBridge;
+    private View androidSettingsGear;
 
     private boolean isAutomotiveDevice() {
         try {
@@ -181,7 +182,9 @@ public class GameActivity extends SDLActivity {
             java.util.Locale appLocale = android.os.Build.VERSION.SDK_INT >= 24
                     ? getResources().getConfiguration().getLocales().get(0)
                     : getResources().getConfiguration().locale;
-            androidIniCreatedV86 = UT99Paths.ensureAndroidIni(dataRoot, UT99Paths.preferredGameLanguage(this, appLocale));
+            String chosenLanguage = AndroidGameSettings.language(this);
+            androidIniCreatedV86 = UT99Paths.ensureAndroidIni(dataRoot, chosenLanguage.isEmpty()
+                    ? UT99Paths.preferredGameLanguage(this, appLocale) : chosenLanguage);
             if (legacySafeMode && androidIniCreatedV86) {
                 applyLegacyOuyaSafeIni(dataRoot);
             } else if (legacySafeMode) {
@@ -227,6 +230,7 @@ public class GameActivity extends SDLActivity {
         ut99V50Immersive(); // v50 onCreate
         applyUt99ImmersiveMode();
         ut99InstallRetroTouchBeta4();
+        installAndroidSettingsButton();
     }
 
 
@@ -1220,7 +1224,75 @@ public class GameActivity extends SDLActivity {
     }
 
     boolean ut99RetroTouchPreferenceEnabled() {
+        String mode = AndroidGameSettings.touch(this);
+        if (mode.equals("on")) return true;
+        if (mode.equals("off")) return false;
         return ut99V91ReadTouchOverlayEnabled();
+    }
+
+    boolean ut99ForceTouchControls() { return AndroidGameSettings.touch(this).equals("on"); }
+
+    float ut99TouchOpacity() { return AndroidGameSettings.touchOpacity(this) / 100f; }
+
+    private void installAndroidSettingsButton() {
+        final float density = getResources().getDisplayMetrics().density;
+        View gear = new View(this) {
+            final android.graphics.Paint paint = new android.graphics.Paint(3);
+            @Override protected void onDraw(android.graphics.Canvas canvas) {
+                float cx = getWidth() / 2f, cy = getHeight() / 2f, unit = Math.min(cx, cy);
+                paint.setStyle(android.graphics.Paint.Style.FILL); paint.setColor(0x66000000);
+                canvas.drawCircle(cx, cy, unit * .85f, paint);
+                paint.setColor(0xffddd5c5);
+                for (int tooth = 0; tooth < 8; tooth++) {
+                    canvas.save(); canvas.rotate(tooth * 45, cx, cy);
+                    canvas.drawRect(cx - unit * .10f, cy - unit * .55f, cx + unit * .10f, cy - unit * .30f, paint);
+                    canvas.restore();
+                }
+                paint.setStyle(android.graphics.Paint.Style.STROKE); paint.setStrokeWidth(unit * .13f);
+                canvas.drawCircle(cx, cy, unit * .34f, paint);
+                canvas.drawCircle(cx, cy, unit * .10f, paint);
+            }
+        };
+        gear.setContentDescription(getString(com.ast.ut99.R.string.android_settings));
+        gear.setFocusable(true);
+        gear.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, SettingsActivity.class);
+            intent.putExtra(UT99Paths.EXTRA_DATA_ROOT, dataRoot.getAbsolutePath());
+            startActivityForResult(intent, SettingsActivity.OPEN);
+        });
+        gear.setAlpha(.45f);
+        int size = (int)(40 * density + .5f);
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(size, size,
+                android.view.Gravity.TOP | android.view.Gravity.RIGHT);
+        androidSettingsGear = gear;
+        addContentView(gear, params); gear.bringToFront();
+    }
+
+    void raiseAndroidSettingsButton() {
+        if (androidSettingsGear != null) androidSettingsGear.bringToFront();
+    }
+
+    @Override protected void onActivityResult(int request, int result, android.content.Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request == SettingsActivity.OPEN && result == SettingsActivity.RESET_TOUCH && ut99RetroTouchBridge != null) {
+            ut99RetroTouchBridge.resetLayout();
+        }
+        if (request == SettingsActivity.OPEN && result == SettingsActivity.EDIT_TOUCH && ut99RetroTouchBridge != null) {
+            // Wait for the bridge to restore its mode after the Activity resumes.
+            androidSettingsGear.postDelayed(() -> {
+                if (!ut99RetroTouchBridge.startLayoutEditing()) {
+                    android.widget.Toast.makeText(this, getString(com.ast.ut99.R.string.touch_layout_hidden),
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            }, 600);
+        }
+        if (request == SettingsActivity.OPEN && (result == SettingsActivity.RESTART || result == SettingsActivity.DATA)) {
+            android.content.Intent launcher = new android.content.Intent(this, MainActivity.class);
+            launcher.putExtra("wait_for_game_pid", android.os.Process.myPid());
+            launcher.putExtra("manage_game_data", result == SettingsActivity.DATA);
+            startActivity(launcher);
+            finish();
+        }
     }
 
     private static boolean isAndroidGamepadSourceV47(android.view.InputEvent event) {

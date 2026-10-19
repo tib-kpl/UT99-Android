@@ -13,6 +13,7 @@ var localized string PreviewText, NoPreviewText, MapPickerHint, MapSettingHint;
 var int PreviewRow, PickerControlRow;
 var bool bPreviewMap;
 var bool bMapPicker;
+var bool bSectionHasMap;
 var Texture PickerPicture;
 var string PickerMapName;
 var float PreviewHeight, PreviewLabelY;
@@ -34,10 +35,17 @@ function bool IsMapControl(UWindowDialogControl Control)
     return False;
 }
 
+// Keep the map preview layout on every row of the section holding the map
+// choice, so the screen does not switch layouts while moving between rows.
 function bool HasMapPreview()
 {
     if(Picker != None) return bMapPicker;
-    return Row >= 0 && Row < Count-1 && IsMapControl(Controls[Row]);
+    return bSectionHasMap;
+}
+
+function bool IsMapRow()
+{
+    return Picker == None && Row >= 0 && Row < Count-1 && IsMapControl(Controls[Row]);
 }
 
 function BeforePaint(Canvas C, float X, float Y)
@@ -55,7 +63,7 @@ function BeforePaint(Canvas C, float X, float Y)
     VisibleRows = Max(1, int((WinHeight*0.62)/RowHeight));
     if(Row < FirstRow) FirstRow = Row;
     if(Row >= FirstRow+VisibleRows) FirstRow = Row-VisibleRows+1;
-    if(Row == Count-1) return;
+    if(Picker != None && Row == Count-1) return;
     if(Picker != None) MapName = Picker.List.GetItemValue2(Row);
     else MapName = MatchClient.Map;
     if(MapName == PickerMapName) return;
@@ -101,6 +109,7 @@ function BuildList()
     for(i = 0; i < 512; i++) { Entries[i] = None; Controls[i] = None; }
     Count = 0;
     PreviewRow = -1;
+    bSectionHasMap = False;
     if(MatchClient == None) return;
     if(Picker != None)
     {
@@ -119,7 +128,8 @@ function BuildList()
     {
         Tab = MatchClient.Pages.GetPage(SectionName);
         if(Tab != None) AddControls(Tab.Page, 0);
-
+        for(j = 0; j < Count; j++)
+            if(IsMapControl(Controls[j])) bSectionHasMap = True;
     }
     Count++;
     Row = Clamp(Row, 0, Max(0, Count-1));
@@ -145,15 +155,56 @@ function string Caption(int Index)
         else Value = DisabledText;
     }
     else if(UWindowHSliderControl(Control) != None)
-    {
-        Value = string(UWindowHSliderControl(Control).Value);
-        while(InStr(Value, ".") != -1 && Right(Value, 1) == "0") Value = Left(Value, Len(Value)-1);
-        if(Right(Value, 1) == ".") Value = Left(Value, Len(Value)-1);
-    }
+        Value = SliderText(UWindowHSliderControl(Control));
     else if(UWindowEditControl(Control) != None)
+    {
         Value = UWindowEditControl(Control).EditBox.GetValue();
+        // 469 float fields (FOV Angle) hold "90.000000".
+        if(UWindowEditControl(Control).EditBox.bNumericFloat) Value = TrimNumber(Value);
+    }
     if(Value != "") return Label@"  <"@Value@">";
     return Label;
+}
+
+// 469 sliders use fine steps (Brightness: 2..10 by 0.1). One controller press
+// moves by a round step giving at most about ten levels, never finer than the
+// slider's own step.
+function float SliderStep(UWindowHSliderControl Slider)
+{
+    local float Range, Step, Base;
+    local int i;
+    if(Slider.Step >= 1) return Slider.Step;
+    Range = Slider.MaxValue-Slider.MinValue;
+    if(Range <= 0) return 1;
+    for(Base = 0.01; Base < 100000; Base *= 10)
+        for(i = 0; i < 3; i++)
+        {
+            if(i == 0) Step = Base;
+            else if(i == 1) Step = Base*2;
+            else Step = Base*5;
+            if(Step >= Slider.Step && Range/Step <= 10.01) return Step;
+        }
+    return Range;
+}
+
+function int RoundValue(float F)
+{
+    if(F < 0) return -int(-F+0.5);
+    return int(F+0.5);
+}
+
+function string TrimNumber(string Value)
+{
+    if(InStr(Value, ".") == -1) return Value;
+    while(Right(Value, 1) == "0") Value = Left(Value, Len(Value)-1);
+    if(Right(Value, 1) == ".") Value = Left(Value, Len(Value)-1);
+    return Value;
+}
+
+function string SliderText(UWindowHSliderControl Slider)
+{
+    if(SliderStep(Slider) >= 1) return string(RoundValue(Slider.Value));
+    return TrimNumber(string(Slider.Value));
 }
 
 function ChangeValue(int Direction)
@@ -163,6 +214,7 @@ function ChangeValue(int Direction)
     local UWindowHSliderControl Slider;
     local UWindowEditControl Edit;
     local int Index, Total;
+    local float Step;
     local UWindowList Item;
     if(Count == 0 || Picker != None) return;
     Combo = UWindowComboControl(Controls[Row]);
@@ -185,12 +237,18 @@ function ChangeValue(int Direction)
     }
     else if(Slider != None)
     {
-        if(Slider.Step > 0) Slider.SetValue(Slider.Value+Direction*Slider.Step);
-        else Slider.SetValue(Slider.Value+Direction*FMax(0.01, (Slider.MaxValue-Slider.MinValue)/100));
+        Step = SliderStep(Slider);
+        Slider.SetValue(FClamp(Slider.MinValue+Step*RoundValue((Slider.Value-Slider.MinValue)/Step)+Direction*Step,
+            Slider.MinValue, Slider.MaxValue));
     }
     else if(Edit != None && Edit.EditBox.bCanEdit && Edit.EditBox.bNumericOnly && !Edit.EditBox.bNumericFloat)
     {
         Edit.SetValue(string(Max(0, int(Edit.EditBox.GetValue())+Direction)));
+        Edit.Notify(DE_Change);
+    }
+    else if(Edit != None && Edit.EditBox.bCanEdit && Edit.EditBox.bNumericFloat)
+    {
+        Edit.SetValue(string(Max(0, RoundValue(float(Edit.EditBox.GetValue()))+Direction)));
         Edit.Notify(DE_Change);
     }
     BuildList();
@@ -320,7 +378,7 @@ function string GetLocation()
 {
     local string S;
     S = Super.GetLocation();
-    if(NativeWindow != None) S = S$" / "$RemoveAmpersand(NativeWindow.WindowTitle);
+    if(NativeWindow != None && NativeWindow.WindowTitle != "") S = S$" / "$RemoveAmpersand(NativeWindow.WindowTitle);
     if(SectionName != "") S = S$" / "$RemoveAmpersand(SectionName);
     if(Picker != None) S = S$" / "$RemoveAmpersand(Picker.Text);
     if(EditTarget != None) S = S$" / "$RemoveAmpersand(EditTarget.Text);
@@ -429,7 +487,7 @@ function PaintMapPicker(Canvas C)
     ClipText(C, WinWidth*0.74-TextW*0.5, WinHeight*PreviewLabelY, S);
     C.Font = Root.Fonts[F_Normal];
     if(Picker != None) S = MapPickerHint;
-    else if(HasMapPreview()) S = MapSettingHint;
+    else if(IsMapRow()) S = MapSettingHint;
     else S = HintText;
     TextSize(C, S, TextW, TextH);
     ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, S);

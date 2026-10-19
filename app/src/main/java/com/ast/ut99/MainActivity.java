@@ -55,6 +55,15 @@ import java.util.zip.ZipInputStream;
 public class MainActivity extends Activity {
     private static final int REQ_SELECT_UT99_FOLDER = 3001;
     private static final int REQ_SELECT_UT99_ZIP = 3002;
+    private static final int REQ_SELECT_PARENT_FOLDER = 3003;
+    private static final int REQ_LEGACY_STORAGE = 3004;
+    // Continuation of a storage choice while Android asks for "All files access".
+    private Destination pendingCustomVolume;
+    // A GOTY download never reuses game files found in the chosen folder.
+    private boolean storageChoiceIsDownload;
+    // Game folder to use in place once "All files access" is granted.
+    private File pendingGameFolder;
+    private boolean awaitingAllFilesAccess;
     private static final String DEFAULT_ONLINE_ZIP_URL = "http://ouya.cweiske.de/apks/com.ast.ut99/UT99_v1.400.zip";
 
     private File selectedRoot;
@@ -73,7 +82,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         hideSystemUi();
-        continueStartup();
+        startWhenGameStopped();
     }
 
 
@@ -99,13 +108,47 @@ public class MainActivity extends Activity {
         launchInProgress = false;
         launchRequestedAtMs = 0L;
         android.util.Log.i("UT99Installer", "v87 launcher intent resumed installer; retrying startup preflight");
-        continueStartup();
+        startWhenGameStopped();
+    }
+
+    private void startWhenGameStopped() {
+        final int oldPid = getIntent().getIntExtra("wait_for_game_pid", 0);
+        if (oldPid <= 0) { continueStartup(); return; }
+        showBusyScreen(installText("Fermeture de la partie", "Closing the match"),
+                installText("Enregistrement des réglages…", "Saving settings…"));
+        final long deadline = android.os.SystemClock.uptimeMillis() + 12000;
+        final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+        handler.post(new Runnable() {
+            @Override public void run() {
+                if (isFinishing()) return;
+                android.app.ActivityManager manager = (android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE);
+                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> processes = manager.getRunningAppProcesses();
+                boolean alive = false;
+                if (processes != null) for (android.app.ActivityManager.RunningAppProcessInfo process : processes)
+                    if (process.pid == oldPid && process.uid == android.os.Process.myUid()) alive = true;
+                if (!alive) {
+                    getIntent().removeExtra("wait_for_game_pid");
+                    continueStartup();
+                } else if (android.os.SystemClock.uptimeMillis() < deadline) handler.postDelayed(this, 200);
+                else {
+                    Toast.makeText(MainActivity.this, installText("La fermeture du jeu n’est pas terminée. Réouvre l’application dans quelques secondes.",
+                            "The game is still closing. Open the app again in a few seconds."), Toast.LENGTH_LONG).show();
+                    finish();
+                }
+            }
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         hideSystemUi();
+        if (awaitingAllFilesAccess) {
+            awaitingAllFilesAccess = false;
+            if (hasAllFilesAccess()) continueAfterFileAccess();
+            else Toast.makeText(this, installText("Accès à tous les fichiers refusé : choisissez le stockage interne ou la microSD.",
+                    "All files access denied: choose internal storage or the microSD card."), Toast.LENGTH_LONG).show();
+        }
 
         // UT99_ANDROID_V75_OUYA_ENGINE_HANDOFF_GUARD:
         // On Android 4.1/OUYA, if the SDL activity aborts during native startup,
@@ -444,31 +487,182 @@ public class MainActivity extends Activity {
     }
 
     private void chooseGotyVolume(String language) {
+        storageChoiceIsDownload = true;
+        chooseStorageVolume(volume -> chooseDestinationFolder(volume, "UT99-GOTY", true,
+                destination -> installGoty(destination, language)));
+    }
+
+    private interface Destination { void use(File folder); }
+
+    private void chooseStorageVolume(Destination chosen) {
         final List<File> volumes = new ArrayList<>();
         File[] candidates = Build.VERSION.SDK_INT >= 19 ? getExternalFilesDirs(null)
                 : new File[]{getExternalFilesDir(null)};
         if (candidates != null) for (File dir : candidates) if (dir != null) volumes.add(dir);
         if (volumes.isEmpty()) volumes.add(getFilesDir());
-        String[] names = new String[volumes.size()];
-        for (int i = 0; i < names.length; i++) names[i] = (i == 0
+        String[] names = new String[volumes.size() + 1];
+        for (int i = 0; i < volumes.size(); i++) names[i] = (i == 0
                 ? installText("Stockage interne", "Internal storage")
                 : installText("Carte SD / stockage externe", "SD card / external storage"))
                 + "\n" + volumes.get(i).getAbsolutePath();
+        names[volumes.size()] = installText("Autre dossier…\nAu choix, conservé si l’application est désinstallée",
+                "Other folder…\nAny location, kept if the app is uninstalled");
         new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK).setTitle(installText("Emplacement d’installation", "Install location"))
-                .setItems(names, (dialog, which) -> chooseGotyFolder(volumes.get(which), language))
+                .setItems(names, (dialog, which) -> {
+                    if (which < volumes.size()) chosen.use(volumes.get(which));
+                    else chooseCustomVolume(chosen);
+                })
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
 
-    private void chooseGotyFolder(File volume, String language) {
+    private boolean hasAllFilesAccess() {
+        if (Build.VERSION.SDK_INT >= 30) return Environment.isExternalStorageManager();
+        return Build.VERSION.SDK_INT < 23
+                || checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    // The native engine needs real file paths, so a folder outside the app's
+    // own directories requires Android's "All files access" (or the legacy
+    // storage permission before Android 11).
+    private void chooseCustomVolume(Destination chosen) {
+        pendingCustomVolume = chosen;
+        if (hasAllFilesAccess()) { continueAfterFileAccess(); return; }
+        new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle(installText("Autoriser l’accès aux fichiers", "Allow file access"))
+                .setMessage(installText("Pour utiliser un dossier de votre choix, Android doit autoriser « Accès à tous les fichiers » pour cette application. Le jeu n’accède qu’au dossier choisi.",
+                        "To use a folder of your choice, Android must allow “All files access” for this app. The game only uses the chosen folder."))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(installText("Autoriser", "Allow"), (dialog, which) -> {
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        awaitingAllFilesAccess = true;
+                        try {
+                            startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:" + getPackageName())));
+                        } catch (ActivityNotFoundException ex) {
+                            startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                        }
+                    } else {
+                        requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                                android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQ_LEGACY_STORAGE);
+                    }
+                }).show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == REQ_LEGACY_STORAGE && hasAllFilesAccess()) continueAfterFileAccess();
+    }
+
+    private void continueAfterFileAccess() {
+        File folder = pendingGameFolder;
+        pendingGameFolder = null;
+        if (folder != null) useGameFolder(folder);
+        else openParentFolderPicker();
+    }
+
+    private void openParentFolderPicker() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+            startActivityForResult(intent, REQ_SELECT_PARENT_FOLDER);
+        } catch (ActivityNotFoundException ex) {
+            Toast.makeText(this, installText("Sélecteur de dossiers indisponible", "Folder picker unavailable"), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Maps a local storage tree URI ("primary:Games" or "1234-ABCD:Games") to its file path. */
+    private static File treeUriToFile(Uri uri) {
+        if (uri == null || !"com.android.externalstorage.documents".equals(uri.getAuthority())) return null;
+        String id = DocumentsContract.getTreeDocumentId(uri);
+        int colon = id.indexOf(':');
+        if (colon < 0) return null;
+        String volume = id.substring(0, colon), path = id.substring(colon + 1);
+        File root = "primary".equalsIgnoreCase(volume) ? Environment.getExternalStorageDirectory() : new File("/storage/" + volume);
+        return path.isEmpty() ? root : new File(root, path);
+    }
+
+    // "Choose my UT99 folder": a valid game can run where it is instead of being copied.
+    private void offerFolderInPlace(File root, Uri treeUri) {
+        boolean valid = UT99Paths.hasLaunchableGameData(root);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle(valid ? installText("Jeu Unreal Tournament trouvé", "Unreal Tournament found")
+                        : installText("Fichiers UT99 incomplets", "Incomplete UT99 files"))
+                .setMessage((valid
+                        ? installText("Les fichiers peuvent être utilisés directement dans ce dossier (accès à tous les fichiers requis) ou copiés dans un dossier de l’application.\n",
+                            "The files can be used directly in this folder (all files access required) or copied into an app folder.\n")
+                        : installText("Certains fichiers manquent ou ont une version non prise en charge. Vous pouvez tout de même les copier.\n",
+                            "Some files are missing or unsupported. You can still copy them.\n")) + root.getAbsolutePath())
+                .setNeutralButton(installText("Copier", "Copy"), (dialog, which) -> chooseStorageVolume(volume ->
+                        chooseDestinationFolder(volume, "UT99", false, destination -> installFromFolder(treeUri, destination))))
+                .setNegativeButton(android.R.string.cancel, null);
+        if (valid) builder.setPositiveButton(installText("Utiliser ce dossier", "Use this folder"), (dialog, which) -> {
+            if (hasAllFilesAccess()) useGameFolder(root);
+            else { pendingGameFolder = root; chooseCustomVolume(null); }
+        });
+        builder.show();
+    }
+
+    private void useGameFolder(File root) {
+        UT99Paths.rememberDataRoot(this, root);
+        getIntent().removeExtra("manage_game_data");
+        continueStartup();
+    }
+
+    // A personal folder that already holds a valid game is used in place.
+    private void offerExistingGame(File root, Destination chosen) {
+        new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle(installText("Jeu Unreal Tournament trouvé", "Unreal Tournament found"))
+                .setMessage(installText("Ce dossier contient déjà des fichiers du jeu valides. Ils seront utilisés directement, sans copie.\n",
+                        "This folder already holds valid game files. They will be used directly, without copying.\n") + root.getAbsolutePath())
+                .setPositiveButton(installText("Utiliser ces fichiers", "Use these files"), (dialog, which) -> useGameFolder(root))
+                .setNeutralButton(installText("Autre dossier…", "Other folder…"), (dialog, which) -> {
+                    pendingCustomVolume = chosen;
+                    openParentFolderPicker();
+                })
+                .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private boolean isAppOwnedFolder(File folder) {
+        String path = folder.getAbsolutePath();
+        return path.contains("/Android/data/" + getPackageName()) || path.startsWith(getFilesDir().getAbsolutePath());
+    }
+
+    private void chooseDestinationFolder(File volume, String baseName, boolean download, Destination chosen) {
+        // A personal folder picked by the user is used as is when empty; a
+        // sub-folder is only needed to keep existing files untouched.
+        String[] content = volume.list();
+        if (!isAppOwnedFolder(volume) && content != null && content.length == 0) {
+            new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                    .setTitle(installText("Installer dans ce dossier ?", "Install into this folder?"))
+                    .setMessage(installText("Le dossier est vide. Le jeu y sera installé directement et conservé si l’application est désinstallée.\n",
+                            "The folder is empty. The game will be installed directly in it and kept if the app is uninstalled.\n")
+                            + volume.getAbsolutePath())
+                    .setPositiveButton(installText("Installer ici", "Install here"), (dialog, which) -> chosen.use(volume))
+                    .setNeutralButton(installText("Nouveau sous-dossier", "New sub-folder"),
+                            (dialog, which) -> chooseSubfolderName(volume, baseName, download, chosen))
+                    .setNegativeButton(android.R.string.cancel, null).show();
+            return;
+        }
+        chooseSubfolderName(volume, baseName, download, chosen);
+    }
+
+    private void chooseSubfolderName(File volume, String baseName, boolean download, Destination chosen) {
         EditText name = new EditText(this); name.setSingleLine(true);
-        String proposed = "UT99-GOTY";
+        String proposed = baseName;
         for (int index = 2; new File(volume, proposed).exists() && index < 1000; index++)
-            proposed = "UT99-GOTY-" + index;
+            proposed = baseName + "-" + index;
         name.setText(proposed);
         AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
                 .setTitle(installText("Nom du nouveau dossier", "New folder name"))
-                .setMessage(installText("Dossier de l’application, supprimé si elle est désinstallée. Environ 750 Mo à télécharger et 2,5 Go libres nécessaires.\n",
-                        "App folder, removed when the app is uninstalled. About 750 MB to download and 2.5 GB free required.\n") + volume.getAbsolutePath())
+                .setMessage((isAppOwnedFolder(volume)
+                        ? installText("Dossier de l’application, supprimé si elle est désinstallée. ", "App folder, removed when the app is uninstalled. ")
+                        : installText("Dossier personnel, conservé si l’application est désinstallée. ", "Personal folder, kept if the app is uninstalled. "))
+                        + (download
+                        ? installText("Environ 750 Mo à télécharger et 2,5 Go libres nécessaires.\n",
+                            "About 750 MB to download and 2.5 GB free required.\n")
+                        : installText("Les fichiers seront copiés dans ce nouveau dossier. Le dossier source sera conservé.\n",
+                            "Files will be copied into this new folder. The source folder will be preserved.\n")) + volume.getAbsolutePath())
                 .setView(name).setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(installText("Installer", "Install"), null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
@@ -481,7 +675,7 @@ public class MainActivity extends Activity {
             if (destination.exists()) {
                 name.setError(installText("Ce dossier existe déjà ; choisissez un nouveau nom", "Folder already exists; choose a new name")); return;
             }
-            dialog.dismiss(); installGoty(destination, language);
+            dialog.dismiss(); chosen.use(destination);
         }));
         dialog.show();
     }
@@ -629,6 +823,23 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_SELECT_PARENT_FOLDER) {
+            Destination chosen = pendingCustomVolume;
+            pendingCustomVolume = null;
+            if (resultCode != RESULT_OK || data == null || chosen == null) return;
+            File parent = treeUriToFile(data.getData());
+            if (parent == null || !parent.isDirectory() || !parent.canWrite()) {
+                Toast.makeText(this, installText("Ce dossier n’est pas accessible en écriture. Choisissez un dossier du stockage interne ou de la microSD.",
+                        "This folder is not writable. Choose a folder on internal storage or the microSD card."), Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (!storageChoiceIsDownload && UT99Paths.hasLaunchableGameData(parent)) { offerExistingGame(parent, chosen); return; }
+            if (!storageChoiceIsDownload && UT99Paths.hasUsableGameData(parent))
+                Toast.makeText(this, installText("Ce dossier contient des fichiers UT99 incomplets ou d’une version non prise en charge.",
+                        "This folder holds incomplete or unsupported UT99 files."), Toast.LENGTH_LONG).show();
+            chosen.use(parent);
+            return;
+        }
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             showMissingDataScreen();
             return;
@@ -637,10 +848,18 @@ public class MainActivity extends Activity {
         Uri uri = data.getData();
         tryPersistPermission(data, uri);
 
+        storageChoiceIsDownload = false;
+        File direct = requestCode == REQ_SELECT_UT99_FOLDER ? treeUriToFile(uri) : null;
+        if (direct != null && UT99Paths.hasUsableGameData(direct)) {
+            offerFolderInPlace(direct, uri);
+            return;
+        }
         if (requestCode == REQ_SELECT_UT99_FOLDER) {
-            installFromFolder(uri);
+            chooseStorageVolume(volume -> chooseDestinationFolder(volume, "UT99", false,
+                    destination -> installFromFolder(uri, destination)));
         } else if (requestCode == REQ_SELECT_UT99_ZIP) {
-            installFromZip(uri);
+            chooseStorageVolume(volume -> chooseDestinationFolder(volume, "UT99", false,
+                    destination -> installFromZip(uri, destination)));
         }
     }
 
@@ -654,13 +873,14 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void installFromFolder(final Uri treeUri) {
+    private void installFromFolder(final Uri treeUri, final File destination) {
         showBusyScreen(t("Installiere UT99-Daten", "Installing UT99 data"),
                 t("Ordner wird kopiert …", "Copying folder …"));
         new Thread(() -> {
             final String result;
             try {
-                InstallStats stats = importFolderTree(treeUri, UT99Paths.installRoot(this));
+                InstallStats stats = importFolderTree(treeUri, destination);
+                UT99Paths.rememberDataRoot(this, destination);
                 result = t("Ordnerimport abgeschlossen: ", "Folder import complete: ") + stats.files + " files";
             } catch (Throwable ex) {
                 android.util.Log.e("UT99Installer", "folder import failed", ex);
@@ -673,18 +893,22 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 lastImportMessage = result;
                 Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+                getIntent().removeExtra("manage_game_data");
                 continueStartup();
             });
         }, "UT99FolderInstaller").start();
     }
 
-    private void installFromZip(final Uri zipUri) {
+    private void installFromZip(final Uri zipUri) { installFromZip(zipUri, UT99Paths.installRoot(this)); }
+
+    private void installFromZip(final Uri zipUri, final File destination) {
         showBusyScreen(t("Installiere UT99-Daten", "Installing UT99 data"),
                 t("ZIP wird direkt entpackt …", "Extracting ZIP directly …"));
         new Thread(() -> {
             final String result;
             try {
-                InstallStats stats = importZip(zipUri, UT99Paths.installRoot(this), (phase, percent) -> updateInstallProgress(phase, percent));
+                InstallStats stats = importZip(zipUri, destination, (phase, percent) -> updateInstallProgress(phase, percent));
+                UT99Paths.rememberDataRoot(this, destination);
                 result = t("ZIP-Import abgeschlossen: ", "ZIP import complete: ") + stats.files + " files";
             } catch (Throwable ex) {
                 android.util.Log.e("UT99Installer", "zip import failed", ex);
@@ -698,6 +922,7 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 lastImportMessage = result;
                 Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+                getIntent().removeExtra("manage_game_data");
                 continueStartup();
             });
         }, "UT99ZipInstaller").start();

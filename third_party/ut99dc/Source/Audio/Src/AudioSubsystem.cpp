@@ -388,7 +388,7 @@ UBOOL UGenericAudioSubsystem::PlaySound
 		Id = 16 * --FreeSlot;
 
 	// Compute priority.
-	FLOAT Priority = SoundPriority( Viewport, Location, Volume, Radius );
+	FLOAT Priority = SoundPriority( Viewport, Id, Location, Volume, Radius );
 
 	// If already playing, stop it.
 	INT   Index        = -1;
@@ -559,10 +559,10 @@ void UGenericAudioSubsystem::Update( FPointRegion Region, FCoords& Coords )
 				Playing.Location = Playing.Actor->Location;
 
 			// Update the priority.
-			Playing.Priority = SoundPriority( Viewport, Playing.Location, Playing.Volume, Playing.Radius );
+			Playing.Priority = SoundPriority( Viewport, Playing.Id, Playing.Location, Playing.Volume, Playing.Radius );
 
-			// Compute the spatialization.
-			FVector Location = Playing.Location.TransformPointBy( Coords );
+			// Compute the spatialization; interface sounds play at the listener.
+			FVector Location = IsInterfaceSound(Playing.Id) ? FVector(0,0,0) : Playing.Location.TransformPointBy( Coords );
 			FLOAT   PanAngle = appAtan2(Location.X, Abs(Location.Z));
 
 			// Despatialize sounds when you get real close to them.
@@ -611,7 +611,7 @@ void UGenericAudioSubsystem::Update( FPointRegion Region, FCoords& Coords )
 			{
 				// Start this new sound.
 				guard(StartSample);
-				if( !Playing.Channel ) 
+				if( !Playing.Channel )
 					Playing.Channel = StartSample
 						( Index+1, Sample, 
 						  (INT) (Sample->SamplesPerSec * Playing.Pitch * Doppler), 

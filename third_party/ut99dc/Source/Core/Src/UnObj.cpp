@@ -380,8 +380,11 @@ UObject::~UObject()
 		// Destroy the object if necessary.
 		ConditionalDestroy();
 
-		// Remove object from table.
-		UnhashObject( _LinkerIndex );
+		// Remove object from table. The hash key is (Name ^ Outer index), as in
+		// HashObject(); the linker index used here before left destroyed and
+		// replaced objects (e.g. native classes reloaded from 469 Engine.u)
+		// linked in the hash, which later broke lookups or read freed memory.
+		UnhashObject( Outer ? Outer->GetIndex() : 0 );
 		GObjObjects(Index) = NULL;
 		GObjAvailable.AddItem( Index );
 	}
@@ -3060,8 +3063,17 @@ void UObject::UnhashObject( INT OuterIndex )
 			Removed++;
 		}
 	}
-	//check(Removed!=0);
-	//check(Removed==1);
+	// Never leave a dangling entry behind: if the object was hashed under
+	// another key (its outer's index changed since), find it anywhere.
+	if( !Removed )
+		for( INT i=0; i<ARRAY_COUNT(GObjHash); i++ )
+			for( UObject** Other=&GObjHash[i]; *Other!=NULL; )
+			{
+				if( *Other==this )
+					*Other = (*Other)->HashNext;
+				else
+					Other = &(*Other)->HashNext;
+			}
 	unguard;
 }
 
@@ -3273,6 +3285,14 @@ UObject* UObject::StaticConstructObject
 			UObject* SavedOuter = Result->Outer;
 			FName SavedName = Result->Name;
 			DWORD SavedFlags = Result->ObjectFlags;
+			// The constructor value-initializes the whole object, header
+			// included. Losing HashNext cut the object's hash bin after it, so
+			// unrelated objects (Engine.PlayerPawn, Core.ByteProperty, ...)
+			// became unfindable once enough actors were loaded.
+			UObject* SavedHashNext = Result->HashNext;
+			FStateFrame* SavedStateFrame = Result->StateFrame;
+			ULinkerLoad* SavedLinker = Result->_Linker;
+			INT SavedLinkerIndex = Result->_LinkerIndex;
 
 			// Save ALL actor data (everything after UObject header)
 			INT StartOffset = sizeof(UObject);
@@ -3293,6 +3313,10 @@ UObject* UObject::StaticConstructObject
 			Result->Outer = SavedOuter;
 			Result->Name = SavedName;
 			Result->ObjectFlags = SavedFlags;
+			Result->HashNext = SavedHashNext;
+			Result->StateFrame = SavedStateFrame;
+			Result->_Linker = SavedLinker;
+			Result->_LinkerIndex = SavedLinkerIndex;
 
 			// Restore ALL actor data
 			if( ActorDataSize > 0 && SavedActorData )

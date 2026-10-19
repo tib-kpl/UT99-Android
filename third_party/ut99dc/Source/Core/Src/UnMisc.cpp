@@ -1255,6 +1255,24 @@ TryAgain:
 			appSprintf( Result, TEXT("<?%s?%s.%s.%s?>"), LangExt, Package, Section, Key );
 		}
 	}
+#ifndef _UNICODE
+	else
+	{
+		// OldUnreal 469 localization uses "%ls" for string arguments. In this
+		// ANSI build "%ls" would read the char* argument as a wide string
+		// (empty messages, garbage or crashes), so turn it back into "%s".
+		TCHAR* Out = Result;
+		for( const TCHAR* In=Result; *In; )
+		{
+			if( In[0]=='%' && In[1]=='%' )
+				{ *Out++ = *In++; *Out++ = *In++; continue; }
+			if( In[0]=='%' && In[1]=='l' && (In[2]=='s' || In[2]=='c') )
+				{ *Out++ = '%'; In += 2; continue; }
+			*Out++ = *In++;
+		}
+		*Out = 0;
+	}
+#endif
 	return Result;
 	unguard;
 }
@@ -1337,6 +1355,75 @@ CORE_API UBOOL appLoadFileToArray( TArray<BYTE>& Result, const TCHAR* Filename, 
 }
 
 //
+// UT99_ANDROID_UTF8_TEXT_FILES:
+// OldUnreal 469 ships its .int/.frt/... localization as UTF-8 (usually with a
+// BOM). The ANSI engine used to read those bytes one by one, so "é" became
+// "Ã©". Decode UTF-8 and store each character as the Windows-1252 byte that
+// retail localization files used, which is what UT99 fonts are drawn for.
+//
+static INT DecodeUtf8Char( const BYTE* S, INT Remaining, DWORD& Code )
+{
+	if( S[0]<0x80 ) { Code = S[0]; return 1; }
+	INT Count = (S[0]&0xE0)==0xC0 ? 2 : (S[0]&0xF0)==0xE0 ? 3 : (S[0]&0xF8)==0xF0 ? 4 : 0;
+	if( !Count || Count>Remaining )
+		return 0;
+	Code = S[0] & (0xFF>>(Count+1));
+	for( INT i=1; i<Count; i++ )
+	{
+		if( (S[i]&0xC0)!=0x80 )
+			return 0;
+		Code = (Code<<6) | (S[i]&0x3F);
+	}
+	static const DWORD MinCode[5] = { 0, 0, 0x80, 0x800, 0x10000 };
+	return Code>=MinCode[Count] && Code<=0x10FFFF ? Count : 0;
+}
+
+// Returns true when the bytes are valid UTF-8 and contain at least one
+// multi-byte character; plain ASCII and Windows-1252 retail files stay ANSI.
+static UBOOL LooksLikeUtf8( const BYTE* S, INT Size )
+{
+	UBOOL MultiByte = 0;
+	for( INT i=0; i<Size; )
+	{
+		DWORD Code;
+		INT Count = DecodeUtf8Char( S+i, Size-i, Code );
+		if( !Count )
+			return 0;
+		MultiByte |= Count>1;
+		i += Count;
+	}
+	return MultiByte;
+}
+
+static void AppendUtf8Char( TArray<TCHAR>& Out, DWORD Code )
+{
+#ifdef _UNICODE
+	Out.AddItem( Code<=0xFFFF ? (TCHAR)Code : (TCHAR)'?' );
+#else
+	if( Code<0x80 || (Code>=0xA0 && Code<=0xFF) )
+	{
+		Out.AddItem( (TCHAR)Code );
+		return;
+	}
+	// Windows-1252 0x80..0x9F.
+	static const _WORD Cp1252[32] =
+	{
+		0x20AC,0,0x201A,0x0192,0x201E,0x2026,0x2020,0x2021,0x02C6,0x2030,0x0160,0x2039,0x0152,0,0x017D,0,
+		0,0x2018,0x2019,0x201C,0x201D,0x2022,0x2013,0x2014,0x02DC,0x2122,0x0161,0x203A,0x0153,0,0x017E,0x0178
+	};
+	for( INT i=0; i<32; i++ )
+	{
+		if( Cp1252[i] && Cp1252[i]==Code )
+		{
+			Out.AddItem( (TCHAR)(0x80+i) );
+			return;
+		}
+	}
+	Out.AddItem( (TCHAR)'?' );
+#endif
+}
+
+//
 // Load a text file to an FString.
 // Supports all combination of ANSI/Unicode files and platforms.
 //
@@ -1368,6 +1455,29 @@ CORE_API UBOOL appLoadFileToString( FString& Result, const TCHAR* Filename, FFil
 		ResultArray.Add( Size/sizeof(TCHAR) );
 		for( INT i=0; i<ResultArray.Num()-1; i++ )
 			ResultArray( i ) = FromUnicode( (_WORD)(ANSICHARU)Ch(i*2+3) + (_WORD)(ANSICHARU)Ch(i*2+2)*256 );
+	}
+	else if( (Size>=3 && (BYTE)Ch(0)==0xef && (BYTE)Ch(1)==0xbb && (BYTE)Ch(2)==0xbf)
+		|| LooksLikeUtf8( (const BYTE*)&Ch(0), Size ) )
+	{
+		// UTF-8, with or without BOM.
+		const BYTE* S = (const BYTE*)&Ch(0);
+		INT i = (Size>=3 && S[0]==0xef && S[1]==0xbb && S[2]==0xbf) ? 3 : 0;
+		ResultArray.Empty( Size+1 );
+		while( i<Size )
+		{
+			DWORD Code;
+			INT Count = DecodeUtf8Char( S+i, Size-i, Code );
+			if( !Count )
+			{
+				// Invalid byte inside a BOM-marked file: keep it as ANSI.
+				Code = S[i];
+				Count = 1;
+				ResultArray.AddItem( FromAnsi( (ANSICHAR)Code ) );
+			}
+			else AppendUtf8Char( ResultArray, Code );
+			i += Count;
+		}
+		ResultArray.AddItem( 0 );
 	}
 	else
 	{

@@ -903,6 +903,8 @@ public:
     DECLARE_FUNCTION(execLinkSkelAnim);
     DECLARE_FUNCTION(execGetCacheEntry);
     DECLARE_FUNCTION(execMoveCacheEntry);
+    DECLARE_FUNCTION(execAddToPackageMap);
+    DECLARE_FUNCTION(execIsInPackageMap);
     #endif
     DECLARE_FUNCTION(execGetNextIntDesc);
     DECLARE_FUNCTION(execGetNextInt);

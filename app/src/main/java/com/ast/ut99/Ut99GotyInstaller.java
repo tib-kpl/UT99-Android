@@ -20,7 +20,11 @@ final class Ut99GotyInstaller {
     static void install(File cache, File destination, String language, Progress progress) throws Exception {
         if (!Arrays.asList("ctt", "det", "elt", "est", "frt", "int", "itt", "nlt", "ptt", "rut").contains(language))
             throw new IOException("Unsupported language");
-        if (destination.exists()) throw new IOException("Choose a new folder; existing files are preserved");
+        // An existing folder is accepted only when empty, so user files are never mixed or replaced.
+        boolean inPlace = destination.isDirectory();
+        String[] existing = inPlace ? destination.list() : null;
+        if ((destination.exists() && !inPlace) || (inPlace && (existing == null || existing.length > 0)))
+            throw new IOException("Choose an empty or new folder; existing files are preserved");
         mkdir(cache);
         progress.update("OldUnreal", 0);
         JSONObject release;
@@ -58,14 +62,16 @@ final class Ut99GotyInstaller {
         File zip = child(cache, patch.getString("name"));
         download(patch.getString("browser_download_url"), zip, patch.getLong("size"), "SHA-256", hash,
                 release.getString("tag_name"), progress);
-        File parent = destination.getCanonicalFile().getParentFile();
+        // Stage beside a new folder, or inside the chosen empty folder (its parent,
+        // such as a microSD root, may not be writable).
+        File parent = inPlace ? destination.getCanonicalFile() : destination.getCanonicalFile().getParentFile();
         mkdir(parent);
         if (parent.getUsableSpace() > 0 && parent.getUsableSpace() < 1500L * 1024 * 1024)
             throw new IOException("At least 1.5 GB free is required at the destination");
         File stage = new File(parent, ".ut99-install-" + UUID.randomUUID());
         mkdir(stage);
         try {
-            extractDisc(iso, stage, progress);
+            extractDisc(iso, stage, language, progress);
             extractPatch(zip, stage, language, progress);
             UT99Paths.normalizeInstalledDataRoot(stage);
             if (!UT99Paths.hasLaunchableGameData(stage)) throw new IOException("Installed game data failed validation");
@@ -73,18 +79,25 @@ final class Ut99GotyInstaller {
                 throw new IOException("The selected translation is missing from the official patch");
             write(new File(stage, ".ut99-install-source"),
                     ("OldUnreal GOTY\n" + release.getString("tag_name") + "\nLanguage=" + language + "\n").getBytes("UTF-8"));
-            if (destination.exists() || !stage.renameTo(destination)) throw new IOException("Cannot finalize installation");
+            if (inPlace) {
+                File[] staged = stage.listFiles();
+                if (staged == null) throw new IOException("Cannot finalize installation");
+                for (File file : staged)
+                    if (!file.renameTo(new File(destination, file.getName()))) throw new IOException("Cannot finalize installation");
+                if (!stage.delete()) throw new IOException("Cannot remove temporary installation folder");
+            } else if (destination.exists() || !stage.renameTo(destination)) throw new IOException("Cannot finalize installation");
         } finally { if (stage.exists()) removeOwnedStage(stage); }
         // Keep downloads for retries, but release their storage after success.
         iso.delete(); zip.delete();
         progress.update("OK", 100);
     }
 
-    static void extractDisc(File image, File target, Progress progress) throws IOException {
+    static void extractDisc(File image, File target, String language, Progress progress) throws IOException {
         try (Ut99DiscImage disc = new Ut99DiscImage(image)) {
             int done = 0;
             for (Ut99DiscImage.Entry entry : disc.entries()) {
                 String path = selectedPath(entry.path);
+                if (path != null && isOtherLanguage(path, language)) path = null;
                 if (path != null) {
                     boolean compressed = path.toLowerCase(Locale.ROOT).endsWith(".uz");
                     if (compressed) path = path.substring(0, path.length() - 3);
@@ -129,6 +142,14 @@ final class Ut99GotyInstaller {
                 progress.update("OldUnreal · " + entry.getName(), ++done * 100 / archive.size());
             }
         }
+    }
+
+    /** The disc also carries Spanish and Italian text; keep only English and the chosen language. */
+    private static boolean isOtherLanguage(String path, String language) {
+        String name = path.toLowerCase(Locale.ROOT);
+        int dot = name.lastIndexOf('.');
+        String extension = dot < 0 ? "" : name.substring(dot + 1);
+        return extension.matches("ctt|det|elt|est|frt|itt|nlt|ptt|rut") && !extension.equals(language);
     }
 
     private static String selectedPath(String path) {

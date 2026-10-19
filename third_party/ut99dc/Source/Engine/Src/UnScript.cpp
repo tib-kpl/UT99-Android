@@ -25,7 +25,13 @@ Revision history:
 // native so it also works with retail Engine.u/Botpack.u data: only during
 // CityIntro, only for the high-volume ClientPlaySound style calls, keep one
 // Interface-slot voice at a moderate gain and suppress the three duplicate layers.
+//
+// OldUnreal 469 ClientPlaySound() plays the narration only once on SLOT_None
+// (four layers only with bLegacyVolumeBoost), so keep whichever layer arrives
+// first in a tick and drop only the same-tick duplicates of that sound.
 static INT GUT99AndroidIntroVoiceSoftcapLogCount = 0;
+static USound* GUT99AndroidIntroVoiceLastSound = NULL;
+static FLOAT GUT99AndroidIntroVoiceLastTime = -1.f;
 
 static UBOOL UT99AndroidIsCityIntroLevel( AActor* Actor )
 {
@@ -66,7 +72,10 @@ static UBOOL UT99AndroidMaybeFilterCityIntroVoice( AActor* Actor, UFunction* Cal
 		return 0;
 
 	const FLOAT OldVolume = Volume;
-	const UBOOL bKeepInterfaceLayer = Slot==SLOT_Interface;
+	const FLOAT Now = Actor->Level ? Actor->Level->TimeSeconds : 0.f;
+	const UBOOL bKeepInterfaceLayer = Sound!=GUT99AndroidIntroVoiceLastSound || Now!=GUT99AndroidIntroVoiceLastTime;
+	GUT99AndroidIntroVoiceLastSound = Sound;
+	GUT99AndroidIntroVoiceLastTime = Now;
 	if( bKeepInterfaceLayer )
 		Volume = 1.15f;
 
@@ -863,6 +872,14 @@ void AActor::CheckHearSound(APawn* Hearer, INT Id, USound* Sound, FVector Parame
 	else
 		HearSource = Hearer->Location;
 
+	// OldUnreal 469 announcer sounds come from an AnnouncerSpectator placed
+	// anywhere in the level; interface sounds are heard regardless of distance.
+	if( (Id&14)==SLOT_Interface*2 )
+	{
+		Hearer->eventClientHearSound( this, Id, Sound, Location, Parameters );
+		return;
+	}
+
 	FLOAT NewRadiusSquared = RadiusSquared/1.3f;
 	FLOAT DistSq = (HearSource-Location).SizeSquared();
 	if( DistSq < NewRadiusSquared )
@@ -1508,14 +1525,22 @@ void AActor::execVisibleCollidingActors( FFrame& Stack, RESULT_DECL )
 	P_GET_ACTOR_REF(OutActor);
 	P_GET_FLOAT_OPTX(Radius,0.0);
 	P_GET_VECTOR_OPTX(TraceLocation,Location);
-	P_GET_UBOOL_OPTX(bIgnoreHidden, 0); 
+	P_GET_UBOOL_OPTX(bIgnoreHidden, 0);
+	// OldUnreal 469 added "optional bool bAddOtherRadius". Retail bytecode
+	// ends the call after bIgnoreHidden, so read it only when present;
+	// skipping it left the script stack misaligned and crashed in HitWall.
+	DWORD bAddOtherRadius = 0;
+	if( *Stack.Code != EX_EndFunctionParms )
+		Stack.Step( Stack.Object, &bAddOtherRadius );
 	P_FINISH;
 
 	Radius = Radius ? Radius : 1000;
 	BaseClass = BaseClass ? BaseClass : AActor::StaticClass();
 	FMemMark Mark(GMem);
-	FCheckResult* Link=GetLevel()->Hash->ActorRadiusCheck( GMem, TraceLocation, Radius, 0 );
-	
+	// With bAddOtherRadius an actor counts when its collision cylinder reaches
+	// the radius, so search wider and filter on Radius + CollisionRadius.
+	FCheckResult* Link=GetLevel()->Hash->ActorRadiusCheck( GMem, TraceLocation, bAddOtherRadius ? Radius + 1024.f : Radius, 0 );
+
 	PRE_ITERATOR;
 		// Fetch next actor in the iteration.
 		*OutActor = NULL;
@@ -1524,8 +1549,9 @@ void AActor::execVisibleCollidingActors( FFrame& Stack, RESULT_DECL )
 			while
 			(	Link
 			&&	(!Link->Actor
-			||	!Link->Actor->IsA(BaseClass) 
+			||	!Link->Actor->IsA(BaseClass)
 			||  (bIgnoreHidden && Link->Actor->bHidden)
+			||  (bAddOtherRadius && (Link->Actor->Location - TraceLocation).SizeSquared() >= Square(Radius + Link->Actor->CollisionRadius))
 			||	!GetLevel()->Model->FastLineCheck(Link->Actor->Location, TraceLocation)) )
 				Link=Link->GetNext();
 

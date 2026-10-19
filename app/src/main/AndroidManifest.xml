@@ -9,6 +9,8 @@
     <!-- Needed on very old Android versions when pushing game data to external storage. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- Only requested when the user installs or imports into a folder of their choice. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- Multiplayer / LAN / listen-server sockets. Required before IpDrv can bind UDP/TCP. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -50,6 +52,12 @@
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <activity android:name="com.ast.ut99.SettingsActivity"
+            android:exported="false" android:process=":game"
+            android:hardwareAccelerated="true" android:screenOrientation="landscape"
+            android:enableOnBackInvokedCallback="false"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
         <activity
             android:name="com.ast.ut99.GameActivity"

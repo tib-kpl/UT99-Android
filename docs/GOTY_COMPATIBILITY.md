@@ -456,3 +456,44 @@ après cette compatibilité. Elle devra conserver l'import des fichiers propres
 à l'utilisateur, proposer le dossier cible et **le choix de la langue avant le
 téléchargement**, avec la langue de l'appareil présélectionnée et modifiable.
 Ce parcours sera commun aux deux variantes de menu.
+
+## Correctifs 2.3.2 avec les fichiers 469f
+
+Ces corrections ont été vérifiées sur la Thor avec une installation GOTY
+neuve (ISO officielle + patch 469f, français) produite par le code de
+l'installateur.
+
+- **Table des objets.** Le constructeur natif des acteurs remet tout l'objet à
+  zéro ; `HashNext`, `StateFrame` et le lien vers le linker sont maintenant
+  restaurés comme les autres champs d'en-tête. Le destructeur retire l'objet
+  avec la clé de hachage réelle (nom et index du parent) au lieu de l'index
+  du linker. Sans cela, des classes comme `Engine.PlayerPawn`,
+  `Core.ByteProperty` ou `Core.State` devenaient introuvables pendant le
+  chargement de CTF-Coret, DM-Liandri, AS-Rook ou DM-Turbine.
+- **Signatures natives 469.** `VisibleCollidingActors` lit le paramètre
+  facultatif `bAddOtherRadius` et `ResetConfig` le paramètre `PropName`
+  seulement s'ils sont présents : l'ancien bytecode reste valide et le
+  décalage de la pile de script (plantage de DM-Phobos) disparaît.
+  `AddToPackageMap` et `IsInPackageMap` (natives 1718 et 1719) sont fournies.
+- **Textes.** Les fichiers de localisation UTF-8 sont convertis en
+  Windows-1252 au chargement, et les formats `%ls` des messages 469 sont
+  ramenés à `%s` dans ce moteur ANSI.
+- **Sons d'interface.** Comme dans 469, `SLOT_Interface` n'est ni atténué ni
+  spatialisé : la narration de CityIntro et les annonces jouées par
+  `AnnouncerSpectator` sont de nouveau audibles.
+
+Douze cartes (DM, CTF, DOM, AS, LMS) ont tourné avec des bots sans plantage
+sur ces données. Les mods 469 restent à vérifier au cas par cas.
+
+### Menu console et emplacement des données (2.3.2)
+
+- Les curseurs 469 à pas fin (Clarté : 2 à 10 par 0,1) avancent par niveaux
+  entiers au pad ; les champs décimaux comme l'angle de vision s'affichent
+  sans zéros inutiles et se règlent de 1 en 1.
+- Le navigateur de serveurs n'ouvre plus la fenêtre d'informations native que
+  469 affiche en flottant sur les petits écrans.
+- « Autre dossier… » permet d'installer ou d'importer le jeu dans un dossier
+  au choix (permission « Accès à tous les fichiers »). Un dossier vide est
+  utilisé directement ; un dossier contenant déjà un jeu valide peut être
+  utilisé sur place, sauf pendant un téléchargement GOTY. Ces dossiers sont
+  conservés si l'application est désinstallée.

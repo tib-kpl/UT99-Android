@@ -143,6 +143,10 @@ final class Ut99RetroTouchBridge {
         // overlay disappears while a GAMEPAD/JOYSTICK exists and returns after
         // disconnect/disable without restarting the Activity.
         view.setAutoHideOnController(false);
+        // Layout editing is reached from the Android settings screen instead of
+        // a second corner icon next to the settings gear.
+        view.setEditButtonVisible(false);
+        view.setAlpha(host.ut99TouchOpacity());
         cachedControllerConnected = RetroTouchControllers.isControllerConnected();
         cachedDesktopInput = host.ut99RetroTouchHasDesktopInput();
         lastControllerReadMs = android.os.SystemClock.uptimeMillis();
@@ -155,6 +159,18 @@ final class Ut99RetroTouchBridge {
         // controls are actually needed.
         view.setVisibility(android.view.View.GONE);
         lastNativeResetSerial = host.ut99RetroTouchInputResetSerial();
+    }
+
+    /** Returns false while no touch layout is shown, since there is nothing to edit. */
+    boolean startLayoutEditing() {
+        if (appliedMode == RetroTouchMode.OFF) return false;
+        view.setEditing(true);
+        return true;
+    }
+
+    void resetLayout() {
+        view.resetToDefault();
+        view.saveLayout();
     }
 
     RetroTouchView getView() {
@@ -367,6 +383,8 @@ final class Ut99RetroTouchBridge {
         if (forceLog || now - lastConfigReadMs >= CONFIG_POLL_MS) {
             lastConfigReadMs = now;
             cachedTouchControlsEnabled = host.ut99RetroTouchPreferenceEnabled();
+            float opacity = host.ut99TouchOpacity();
+            if (view.getAlpha() != opacity) view.setAlpha(opacity);
         }
 
         boolean controllerChanged = false;
@@ -390,7 +408,7 @@ final class Ut99RetroTouchBridge {
 
         RetroTouchMode wanted = RetroTouchMode.OFF;
         if (cachedTouchControlsEnabled && touchCapable
-                && !cachedControllerConnected && !cachedDesktopInput) {
+                && (host.ut99ForceTouchControls() || (!cachedControllerConnected && !cachedDesktopInput))) {
             if (nativeUiState == 1) {
                 wanted = RetroTouchMode.NAVIGATION;
             } else if (nativeUiState == 2) {
@@ -478,6 +496,7 @@ final class Ut99RetroTouchBridge {
             view.setVisibility(android.view.View.GONE);
         } else {
             view.bringToFront();
+            host.raiseAndroidSettingsButton();
         }
         view.invalidate();
         Log.i(TAG, "mode=" + wanted);
