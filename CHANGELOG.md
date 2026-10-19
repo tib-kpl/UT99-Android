@@ -1,90 +1,83 @@
-# Historique des versions
+# Changelog
 
-Chaque version publiée contient deux APK signés : **console-menu** (menu
-console/téléphone) et **classic-menu** (menu UT99 d'origine). Les correctifs du
-moteur s'appliquent aux deux. Les versions sont publiées sur
-[la page des releases](https://github.com/tib-kpl/UT99-Android/releases).
+Each release ships two signed APKs: **console-menu** (console/phone menu) and
+**classic-menu** (original UT99 menu). Engine fixes apply to both. Releases are
+published on [the releases page](https://github.com/tib-kpl/UT99-Android/releases).
 
 ## 2.3.11
 
-- Menu console : champs de saisie et listes déroulantes redessinés (fond
-  sombre, liseré doré, texte blanc) ; petits boutons plats assortis au menu, à
-  la place des contrôles en relief de style Windows.
-- Le contour vert qu'Android dessinait autour du jeu après une navigation à la
-  manette ou au clavier est supprimé.
+- Console menu: edit boxes and combos redrawn as dark panels with a gold
+  outline and white text; small buttons are flat and match the menu rows,
+  instead of the bevelled Windows-style controls.
+- Removed the green outline Android drew around the game after gamepad or
+  keyboard navigation.
 
 ## 2.3.10
 
-- Menu console : pendant une saisie, le champ, le texte tapé et l'aide restent
-  dans le quart supérieur de l'écran, au-dessus du clavier Android.
-- L'étiquette du champ est en blanc au lieu de noir.
+- Console menu: while typing, the field, the typed text and the hint stay in
+  the top quarter of the screen, above the Android keyboard.
+- The field label is white instead of black.
 
 ## 2.3.9
 
-- Plus de page vide après la première recherche de serveurs LAN ou Internet :
-  la fenêtre d'informations serveur du navigateur 469 est masquée.
+- No more empty page after the first LAN or Internet server search: the 469
+  browser's server info window is hidden.
 
 ## 2.3.8
 
-- Ouverture du menu plus rapide depuis une carte microSD : la liste des cartes
-  n'est plus relue en entier pour chaque carte (environ 0,6 s au lieu de
-  1,5 à 2,7 s sur Odin 2).
+- Faster menu opening from a microSD card: the map list is no longer reread
+  for every map (about 0.6 s instead of 1.5–2.7 s on an Odin 2).
 
 ## 2.3.7
 
-- Retour à l'écran de verrouillage Android normal (le passage automatique du
-  verrouillage sans code, ajouté en 2.3.5, est retiré).
+- Back to the normal Android lock screen (the automatic dismissal of a
+  swipe-only lock screen added in 2.3.5 is removed).
 
 ## 2.3.6
 
-- Ouverture du menu plus rapide avec les fichiers OldUnreal 469 : suppression
-  d'un parcours de tous les objets à chaque entrée du menu, lecture des
-  fichiers `.int` déplacée au démarrage du moteur.
+- Faster menu opening with OldUnreal 469 data: menu input no longer walks every
+  loaded object, and `.int` files are read at engine start.
 
 ## 2.3.5
 
-- Multijoueur : le client annonce la version réseau 436 et rejoint les
-  serveurs qui exigent 436 (« Serveur incompatible : UT requis 436 »).
-  Les serveurs qui exigent 469 restent inaccessibles.
+- Multiplayer: the client advertises network version 436 and joins servers that
+  require 436 ("Incompatible server: UT 436 required"). Servers that require
+  469 remain unreachable.
 
 ## 2.3.4
 
-- Correction d'un plantage en partie (contacts entre joueurs, dégâts) avec les
-  fichiers 469.
-- Le rouage des réglages ne prend plus le focus de la manette au lancement ni à
-  la sortie de veille.
-- Clarté réglée à 6 par défaut à la première installation.
+- Fixed an in-match crash (players touching, taking damage) with 469 data.
+- The settings gear no longer steals gamepad focus at launch or after waking.
+- Brightness defaults to 6 on a fresh install.
 
 ## 2.3.3
 
-- Voix localisées du disque GOTY conservées pour la langue choisie
-  (narration de l'intro, annonceur, joueurs) : français, espagnol, italien.
+- Localized GOTY voices kept for the chosen language (intro narration,
+  announcer, players): French, Spanish, Italian.
 
 ## 2.3.2
 
-- Corrections du moteur pour les fichiers OldUnreal 469f : chargement de
-  CTF-Coret, DM-Liandri, AS-Rook, DM-Turbine, voix de l'intro, textes UTF-8
-  des menus, sons d'interface.
-- Rouage de réglages Android en jeu : manette tactile (mode, opacité,
-  disposition), langue du jeu, emplacement des données.
-- Installation ou import dans n'importe quel dossier ; un dossier contenant
-  déjà un jeu valide peut être utilisé sur place.
-- Menu console : curseurs par pas entiers, aperçu de carte stable.
+- Engine fixes for OldUnreal 469f data: CTF-Coret, DM-Liandri, AS-Rook and
+  DM-Turbine load, intro voice, UTF-8 menu text, interface sounds.
+- In-game Android settings gear: touch controller (mode, opacity, layout),
+  game language, data location.
+- Install or import into any folder; a folder that already holds a valid game
+  can be used in place.
+- Console menu: whole-step sliders, stable map preview.
 
 ## 2.3.1
 
-- Installation des données GOTY officielles (disque GOTY et dernier patch
-  OldUnreal) avec choix de la langue et du stockage interne/microSD.
+- Install the official GOTY data (GOTY disc and latest OldUnreal patch) with
+  language and internal/microSD storage choice.
 
 ## 2.3.0
 
-- Prise en charge des paquets système UT99 récents (OldUnreal 469) par le
-  moteur Android natif.
+- Native Android engine support for recent UT99 system packages (OldUnreal 469).
 
 ## 2.2.3
 
-- Pourcentage de téléchargement des paquets HTTP rétabli dans les deux menus.
+- HTTP package download percentage restored in both menus.
 
 ## 2.2.2
 
-- Compatibilité des propriétés Core et des API de script récentes.
+- Compatibility with recent Core properties and script APIs.

@@ -1,48 +1,49 @@
-# UT99-Android : feuille de route
+# UT99-Android TODO / Roadmap
 
-## Moteur
+## Core Engine
 
-- [x] UT99 sur Android (moteur natif v400)
-- [x] Android 4.1.2+ (OUYA) jusqu'à Android 16
-- [x] Builds 32 et 64 bits (armeabi-v7a, arm64-v8a)
-- [x] Rendu OpenGL ES
-- [x] Chargement des paquets système OldUnreal 469f
-- [ ] Mods et protections de serveurs 469 récents (au cas par cas)
+- [x] UT99 running on Android (native v400 engine)
+- [x] Android 4.1.2+ (OUYA) up to Android 16
+- [x] 32 and 64-bit builds (armeabi-v7a, arm64-v8a)
+- [x] OpenGL ES renderer
+- [x] Loading OldUnreal 469f system packages
+- [ ] Recent 469 mods and server protections (case by case)
 
-## Données du jeu
+## Game Data
 
-- [x] Import d'un dossier ou d'un ZIP
-- [x] Accès au stockage Android moderne (SAF)
-- [x] Installation des données GOTY officielles depuis l'app, avec choix de la langue
-- [x] Voix localisées du disque GOTY (français, espagnol, italien)
-- [x] Installation dans un dossier au choix, ou utilisation sur place d'un jeu existant
+- [x] Folder / ZIP game data import
+- [x] Android SAF storage support
+- [x] In-app install of the official GOTY data, with language choice
+- [x] Localized GOTY voices (French, Spanish, Italian)
+- [x] Install to any folder, or use an existing game folder in place
 
-## Menus et interface
+## Menus & UI
 
-- [x] Menu console/téléphone pour la manette (variante `console-menu`)
-- [x] Menu UT99 d'origine (variante `classic-menu`)
-- [x] Réglages Android en jeu : manette tactile, langue, emplacement des données
-- [x] Saisie de texte visible au-dessus du clavier Android
-- [x] Champs et boutons au style du menu console
-- [ ] Mêmes améliorations de saisie pour le menu classique
+- [x] Controller-first console/phone menu (`console-menu` variant)
+- [x] Original UT99 menu (`classic-menu` variant)
+- [x] In-game Android settings: touch controller, language, data location
+- [x] Text entry visible above the Android keyboard
+- [x] Console-styled edit boxes and buttons
+- [ ] Same text entry improvements in the classic menu
 
-## Graphismes
+## Graphics & Rendering
 
-- [x] Mise à l'échelle dynamique de la résolution
-- [x] Mise à l'échelle optionnelle pour les appareils modestes
-- [x] Réglage du champ de vision
-- [ ] Rendu Vulkan / pilotes personnalisés comme Turnip (à évaluer)
+- [x] Dynamic resolution scaling
+- [x] Optional scaling for lower spec-devices
+- [x] Additional FoV toggle
+- [ ] Vulkan renderer / custom drivers such as Turnip (to be evaluated)
 
-## Commandes
+## Controls & Input
 
-- [x] Manettes Android et OUYA
-- [x] Souris et clavier
-- [x] Manette tactile RetroTouch (opacité et disposition réglables)
+- [x] Android gamepad support
+- [x] OUYA controller support
+- [x] Android mouse and keyboard support
+- [x] RetroTouch touchscreen overlay (adjustable opacity and layout)
 
-## Multijoueur
+## Multiplayer
 
-- [x] Parties LAN
-- [x] Parties Internet via le navigateur de serveurs
-- [x] Serveurs 432 et 436
-- [ ] Serveurs qui exigent un client 469
-- [ ] Discussion en partie sans clavier physique
+- [x] Local WiFi / LAN games
+- [x] Internet games through the server browser
+- [x] 432 and 436 servers
+- [ ] Servers that require a 469 client
+- [ ] In-game chat without a physical keyboard

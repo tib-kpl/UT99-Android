@@ -109,9 +109,9 @@ jobs:
           awk -v v="## $version" '$0==v{on=1;next} on&&/^## /{exit} on' CHANGELOG.md > "$RUNNER_TEMP/changes.md"
           : > "$RUNNER_TEMP/notes.md"
           if [ -s "$RUNNER_TEMP/changes.md" ]; then
-            printf '## Nouveautés de la version %s\n' "$version" >> "$RUNNER_TEMP/notes.md"
+            printf "## What's new in %s\n" "$version" >> "$RUNNER_TEMP/notes.md"
             cat "$RUNNER_TEMP/changes.md" >> "$RUNNER_TEMP/notes.md"
-            printf '\nHistorique complet : %s/%s/blob/%s/CHANGELOG.md\n\n' \
+            printf '\nFull changelog: %s/%s/blob/%s/CHANGELOG.md\n\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> "$RUNNER_TEMP/notes.md"
           fi
           printf '%s\n\n%s\n\n%s\n\nCommit: %s/%s/commit/%s\nBuild: %s/%s/actions/runs/%s\n' \
