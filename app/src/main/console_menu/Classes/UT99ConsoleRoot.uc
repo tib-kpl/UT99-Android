@@ -388,7 +388,7 @@ function CloseActiveWindow()
 defaultproperties
 {
     NetworkErrorTitle="CONNECTION FAILED"
-    LookAndFeelClass="UMenu.UMenuGoldLookAndFeel"
+    LookAndFeelClass="UT99ConsoleMenu.UT99ConsoleLookAndFeel"
     Backdrop(0)=Texture'UMenu.Icons.Bg11'
     Backdrop(1)=Texture'UMenu.Icons.Bg21'
     Backdrop(2)=Texture'UMenu.Icons.Bg31'

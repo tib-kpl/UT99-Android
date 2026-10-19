@@ -740,7 +740,7 @@ public class GameActivity extends SDLActivity {
                 ut99V60WriteUtf8(ini, text);
                 return;
             }
-            text = ut99V60UpsertKey(text, "UT99ConsoleMenu.UT99ConsoleRoot", "LookAndFeelClass", "UMenu.UMenuGoldLookAndFeel");
+            text = ut99V60UpsertKey(text, "UT99ConsoleMenu.UT99ConsoleRoot", "LookAndFeelClass", "UT99ConsoleMenu.UT99ConsoleLookAndFeel");
             boolean hasConsoleScale = java.util.regex.Pattern.compile(
                     "(?ims)^\\[UT99ConsoleMenu\\.UT99ConsoleRoot\\][^\\[]*?^GUIScale\\s*=").matcher(text).find();
             if (!hasConsoleScale) {
@@ -1714,6 +1714,16 @@ public class GameActivity extends SDLActivity {
     // background.  SDLActivity remains responsible for pausing the native game
     // thread and audio.  Releasing the overlay first also prevents virtual
     // buttons/axes from remaining latched when AAOS switches away from the game.
+    /**
+     * Android draws a coloured focus highlight around the focused game surface
+     * after gamepad or key navigation. The game draws its own menu focus.
+     */
+    private static void ut99HideFocusHighlight(View view) {
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            view.setDefaultFocusHighlightEnabled(false);
+        }
+    }
+
     @Override
     protected void onPause() {
         try {
@@ -1808,6 +1818,7 @@ public class GameActivity extends SDLActivity {
                 sv.setKeepScreenOn(true);
                 sv.setFocusable(true);
                 sv.setFocusableInTouchMode(true);
+                ut99HideFocusHighlight(sv);
                 try {
                     sv.requestFocus();
                 } catch (Throwable ignored) {
@@ -2007,6 +2018,7 @@ public class GameActivity extends SDLActivity {
             sv.setKeepScreenOn(true);
             sv.setFocusable(true);
             sv.setFocusableInTouchMode(true);
+            ut99HideFocusHighlight(sv);
             sv.requestLayout();
             sv.invalidate();
 
