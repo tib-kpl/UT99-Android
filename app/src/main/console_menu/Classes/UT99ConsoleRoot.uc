@@ -287,7 +287,12 @@ function Tick(float Delta)
     for(W = FirstChildWindow; W != None; W = W.NextSiblingWindow)
         if(UWindowFramedWindow(W) != None && W.bWindowVisible && W != MenuBar)
         {
-            if(W.IsA('UBrowserMainWindow'))
+            // Server browser tabs can show their untitled floating info window
+            // when first created. The console server page draws those details
+            // itself, so hide it instead of wrapping it in an empty page.
+            if(W.IsA('UBrowserInfoWindow'))
+                W.HideWindow();
+            else if(W.IsA('UBrowserMainWindow'))
                 DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleServers', 0, 0, WinWidth, WinHeight, W));
             else
                 DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleDialog', 0, 0, WinWidth, WinHeight, W));
