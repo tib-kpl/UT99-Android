@@ -563,8 +563,19 @@ void AActor::execGetMapName( FFrame& Stack, RESULT_DECL )
 
 	*(FString*)Result = TEXT("");
 	TCHAR Wildcard[256];
+	// Scripts walk the map list one GetMapName call at a time. Listing the Maps
+	// folder for every call is slow on Android SD cards, so reuse the list
+	// built for the same prefix during the last two seconds.
+	static FString CachedPrefix;
+	static TArray<FString> CachedMapNames;
+	static DOUBLE CachedTime = -1000.0;
+	const DOUBLE Now = appSeconds();
 	TArray<FString> MapNames;
 	appSprintf( Wildcard, TEXT("*.%s"), *FURL::DefaultMapExt );
+	if( Now - CachedTime < 2.0 && Now >= CachedTime && CachedPrefix == Prefix )
+		MapNames = CachedMapNames;
+	else
+	{
 	for( INT DoCD=0; DoCD<1+(GCdPath[0]!=0); DoCD++ )
 	{
 		for( INT i=0; i<GSys->Paths.Num(); i++ )
@@ -593,6 +604,10 @@ void AActor::execGetMapName( FFrame& Stack, RESULT_DECL )
 				}
 			}
 		}
+	}
+	CachedPrefix = Prefix;
+	CachedMapNames = MapNames;
+	CachedTime = Now;
 	}
 	for( INT i=0; i<MapNames.Num(); i++ )
 	{
