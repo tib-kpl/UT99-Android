@@ -1225,6 +1225,8 @@ final class UT99Paths {
                 "ServerPackages=Botpack\n" +
                 "\n" +
                 "[NSDLDrv.NSDLClient]\n" +
+                // Menu "Clarté" 6 on first install; later menu changes are kept.
+                "Brightness=0.600000\n" +
                 "DefaultDisplay=0\n" +
                 "ScreenFlashes=True\n" +
                 "NoDynamicLights=False\n" +

@@ -1015,6 +1015,9 @@ static UBOOL TouchTo( AActor* Actor, AActor* Other )
 	check(Actor);
 	check(Other);
 	check(Actor!=Other);
+	// An earlier touch in the same move may already have destroyed either actor.
+	if( Actor->bDeleteMe || Other->bDeleteMe )
+		return 0;
 
 	INT Available=-1;
 	for( INT i=0; i<Actor->TouchCount(); i++ )
@@ -1070,6 +1073,11 @@ static UBOOL TouchTo( AActor* Actor, AActor* Other )
 		}
 	}
 
+	// With OldUnreal 469 data Touching is a dynamic array: the UnTouch/Touch
+	// scripts called above and below can shrink or empty it (a projectile that
+	// explodes and destroys itself on touch), so re-check the slot each time.
+	if( Available >= Actor->TouchCount() || Actor->bDeleteMe )
+		return 0;
 	if( Available >= 0 )
 	{
 		// Make Actor touch TouchActor.
@@ -1077,7 +1085,7 @@ static UBOOL TouchTo( AActor* Actor, AActor* Other )
 		Actor->eventTouch( Other );
 
 		// See if first actor did something that caused an UnTouch.
-		if( Actor->TouchAt(Available) != Other )
+		if( Actor->bDeleteMe || Other->bDeleteMe || Available >= Actor->TouchCount() || Actor->TouchAt(Available) != Other )
 			return 0;
 	}
 

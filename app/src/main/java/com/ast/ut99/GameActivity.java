@@ -1254,7 +1254,10 @@ public class GameActivity extends SDLActivity {
             }
         };
         gear.setContentDescription(getString(com.ast.ut99.R.string.android_settings));
-        gear.setFocusable(true);
+        // Touch only: a focusable view took controller input away from SDL
+        // after launch and resume, so the first pad presses did nothing.
+        gear.setFocusable(false);
+        gear.setFocusableInTouchMode(false);
         gear.setOnClickListener(v -> {
             android.content.Intent intent = new android.content.Intent(this, SettingsActivity.class);
             intent.putExtra(UT99Paths.EXTRA_DATA_ROOT, dataRoot.getAbsolutePath());
