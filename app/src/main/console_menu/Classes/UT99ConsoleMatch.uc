@@ -293,9 +293,9 @@ function ActivateRow()
     else if(UWindowEditControl(Control) != None)
     {
         EditTarget = UWindowEditControl(Control);
-        InputField = UWindowEditControl(CreateWindow(class'UWindowEditControl', MenuLeft, WinHeight*0.48, Width, 24));
+        InputField = UWindowEditControl(CreateWindow(class'UWindowEditControl', MenuLeft, EditFieldTop(), Width, 24));
         InputField.SetText(EditTarget.Text);
-        InputField.SetFont(F_Large);
+        InputField.SetFont(F_Large); LightenInputLabel();
         InputField.SetValue(EditTarget.EditBox.GetValue());
         InputField.EditBox.MaxLength = EditTarget.EditBox.MaxLength;
         InputField.EditBox.bNumericOnly = EditTarget.EditBox.bNumericOnly;
@@ -385,6 +385,21 @@ function string GetLocation()
     return S;
 }
 
+// The Android keyboard covers the lower half of a landscape screen, so text
+// entry keeps the logo, location, field and hint in the top quarter.
+function float EditFieldTop()
+{
+    return WinHeight*0.19;
+}
+
+// UWindow labels default to black, which is unreadable on the menu backdrop.
+function LightenInputLabel()
+{
+    local Color White;
+    White.R = 255; White.G = 255; White.B = 255;
+    InputField.SetTextColor(White);
+}
+
 function Paint(Canvas C, float X, float Y)
 {
     local Texture Picture;
@@ -392,15 +407,15 @@ function Paint(Canvas C, float X, float Y)
     local string MapCaption;
     if(InputField != None)
     {
-        W = FMin(WinWidth*0.70, WinHeight*0.82);
+        W = WinHeight*0.22;
         C.Style = 2;
         C.DrawColor.R = 255; C.DrawColor.G = 255; C.DrawColor.B = 255;
-        DrawStretchedTexture(C, (WinWidth-W)*0.5, WinHeight*0.02, W, W*0.5, Texture'UT99Logo');
+        DrawStretchedTexture(C, (WinWidth-W)*0.5, WinHeight*0.01, W, W*0.5, Texture'UT99Logo');
         C.Style = 1;
-        DrawLocation(C, WinHeight*0.35);
+        DrawLocation(C, WinHeight*0.13);
         C.Font = Root.Fonts[F_Normal];
         TextSize(C, EditHint, TextW, TextH);
-        ClipText(C, (WinWidth-TextW)*0.5, WinHeight*0.94, EditHint);
+        ClipText(C, (WinWidth-TextW)*0.5, EditFieldTop()+InputField.WinHeight+4, EditHint);
         return;
     }
     if(HasMapPreview()) { PaintMapPicker(C); return; }

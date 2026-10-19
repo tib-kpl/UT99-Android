@@ -425,8 +425,8 @@ function ActivateRow()
     if(Combo != None && Combo.EditBox.bCanEdit && Picker == None && HistoryEntries[Row] == 0)
     {
         EditComboTarget = Combo;
-        InputField = UWindowEditControl(CreateWindow(class'UWindowEditControl', MenuLeft, WinHeight*0.48, Width, 24));
-        InputField.SetText(Combo.Text); InputField.SetFont(F_Large); InputField.SetValue(Combo.GetValue());
+        InputField = UWindowEditControl(CreateWindow(class'UWindowEditControl', MenuLeft, EditFieldTop(), Width, 24));
+        InputField.SetText(Combo.Text); InputField.SetFont(F_Large); LightenInputLabel(); InputField.SetValue(Combo.GetValue());
         InputField.EditBox.MaxLength = Combo.EditBox.MaxLength;
         InputField.EditBox.ActivateWindow(0, False);
         GetPlayerOwner().ConsoleCommand("ANDROID_SHOW_KEYBOARD");

@@ -340,8 +340,8 @@ function ActivateRow()
         if(Row == Count-3)
         {
             EditTarget = SearchProxy;
-            InputField = UWindowEditControl(CreateWindow(class'UWindowEditControl', MenuLeft, WinHeight*0.48, Width, 24));
-            InputField.SetText(SearchServersText); InputField.SetFont(F_Large); InputField.SetValue(SearchTerm);
+            InputField = UWindowEditControl(CreateWindow(class'UWindowEditControl', MenuLeft, EditFieldTop(), Width, 24));
+            InputField.SetText(SearchServersText); InputField.SetFont(F_Large); LightenInputLabel(); InputField.SetValue(SearchTerm);
             InputField.EditBox.MaxLength = 100; InputField.EditBox.ActivateWindow(0, False);
             GetPlayerOwner().ConsoleCommand("ANDROID_SHOW_KEYBOARD"); BuildList(); return;
         }
