@@ -56,8 +56,8 @@ android {
     defaultConfig {
         buildConfigField 'boolean', 'CONSOLE_MENU', 'true'
         targetSdk 35
-        versionCode 23
-        versionName '2.3.2'
+        versionCode 24
+        versionName '2.3.3'
 
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a'

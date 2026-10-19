@@ -497,3 +497,13 @@ sur ces données. Les mods 469 restent à vérifier au cas par cas.
   utilisé directement ; un dossier contenant déjà un jeu valide peut être
   utilisé sur place, sauf pendant un téléchargement GOTY. Ces dossiers sont
   conservés si l'application est désinstallée.
+
+### Voix localisées (2.3.3)
+
+Le CD GOTY contient des voix françaises, espagnoles et italiennes dans des
+paquets `<nom>.<langue>_uax` (`openingwave.frt_uax`, `Announcer.frt_uax`,
+voix des joueurs, du boss et des tutoriels). Le moteur les charge à la place
+du paquet anglais quand la langue du jeu correspond ; l'installateur les
+supprimait jusqu'ici. Il conserve maintenant ceux de la langue choisie. Une
+installation GOTY faite avec une version précédente doit être refaite pour
+obtenir ces voix.

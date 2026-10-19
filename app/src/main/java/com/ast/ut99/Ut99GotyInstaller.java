@@ -144,11 +144,17 @@ final class Ut99GotyInstaller {
         }
     }
 
-    /** The disc also carries Spanish and Italian text; keep only English and the chosen language. */
+    /**
+     * The disc carries Spanish, Italian and French text plus localized voices
+     * ("Announcer.frt_uax"); keep only English and the chosen language.
+     */
     private static boolean isOtherLanguage(String path, String language) {
         String name = path.toLowerCase(Locale.ROOT);
+        if (name.endsWith(".uz")) name = name.substring(0, name.length() - 3);
         int dot = name.lastIndexOf('.');
         String extension = dot < 0 ? "" : name.substring(dot + 1);
+        int underscore = extension.indexOf('_');
+        if (underscore > 0) extension = extension.substring(0, underscore);
         return extension.matches("ctt|det|elt|est|frt|itt|nlt|ptt|rut") && !extension.equals(language);
     }
 
@@ -160,7 +166,8 @@ final class Ut99GotyInstaller {
             if (!canonical.equalsIgnoreCase(folder)) continue;
             boolean allowed = canonical.equals("System")
                     ? name.matches(".*\\.(u|ini|int|ctt|det|elt|est|frt|itt|nlt|ptt|rut)")
-                    : name.matches(".*\\.(unr|utx|uax|umx)(\\.uz)?");
+                    // Localized packages ("openingwave.frt_uax") replace the English one in that language.
+                    : name.matches(".*\\.([a-z]{3}_)?(unr|utx|uax|umx)(\\.uz)?");
             return allowed ? canonical + "/" + parts[1] : null;
         }
         return null;
