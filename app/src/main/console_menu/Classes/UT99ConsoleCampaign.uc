@@ -324,6 +324,9 @@ function ActivateRow()
     }
     else if(LevelScreen != None)
     {
+        // The ladder ignores Next while its arrow still moves to the newly won
+        // rung; hiding this screen first left only the menu backdrop.
+        if(LevelScreen.PendingPos > LevelScreen.ArrowPos) return;
         if(DetailArea != None) DetailArea.SetParent(LevelScreen);
         bFinished = True; HideWindow();
         LevelScreen.Notify(Controls[Row], DE_Click);
