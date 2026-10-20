@@ -103,8 +103,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          tag="build-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
           version=$(sed -n "s/^ *versionName '\(.*\)'/\1/p" app/build.gradle | head -1)
+          tag="v$version-build$GITHUB_RUN_NUMBER"
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then tag="$tag.$GITHUB_RUN_ATTEMPT"; fi
           # Notes for this version from CHANGELOG.md, up to the next version heading.
           awk -v v="## $version" '$0==v{on=1;next} on&&/^## /{exit} on' CHANGELOG.md > "$RUNNER_TEMP/changes.md"
           : > "$RUNNER_TEMP/notes.md"
