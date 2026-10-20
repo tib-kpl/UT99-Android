@@ -16,6 +16,8 @@ var float NavigationClock, NextBackTime;
 var bool bIgnoreSyntheticHover;
 var localized string NetworkErrorTitle;
 var int ClientNetworkVersion;
+var float BlankMenuTime;
+var int BlankMenuRecoveries;
 
 // Controller focus and touch hit testing do not require a pointer overlay.
 function DrawMouse(Canvas C)
@@ -201,6 +203,50 @@ function Resized()
         DialogScreen.SetSize(WinWidth, WinHeight);
 }
 
+function bool ConsoleScreenVisible()
+{
+    return Home.bWindowVisible || (MatchScreen != None && MatchScreen.bWindowVisible) ||
+        (ListsScreen != None && ListsScreen.bWindowVisible) ||
+        (CampaignScreen != None && CampaignScreen.bWindowVisible) ||
+        (SavesScreen != None && SavesScreen.bWindowVisible) ||
+        (DialogScreen != None && DialogScreen.bWindowVisible);
+}
+
+// A locked campaign transition could leave only the backdrop on screen with
+// no screen to drive. Log the visible root windows (UWindow unlinks hidden
+// ones), then bring the campaign screen back or fall back to the home menu.
+function CheckBlankMenu(float Delta)
+{
+    local UWindowWindow W, Next;
+    if(!Console.bLocked || !Console.bUWindowActive || Console.bQuickKeyEnable || ConsoleScreenVisible())
+    {
+        BlankMenuTime = 0;
+        if(!Console.bLocked) BlankMenuRecoveries = 0;
+        return;
+    }
+    BlankMenuTime += Delta;
+    if(BlankMenuTime < 3) return;
+    BlankMenuTime = 0;
+    Log("UT99Console blank menu: recoveries="@BlankMenuRecoveries@"campaign="@CampaignScreen);
+    for(W = FirstChildWindow; W != None; W = W.NextSiblingWindow)
+        Log("UT99Console blank menu visible child="@W@"owner="@W.OwnerWindow);
+    if(CampaignScreen != None && !CampaignScreen.bFinished && BlankMenuRecoveries == 0)
+    {
+        BlankMenuRecoveries++;
+        CampaignScreen.ShowWindow();
+        CampaignScreen.FocusWindow();
+        return;
+    }
+    BlankMenuRecoveries = 0;
+    Log("UT99Console blank menu: unlocking the console");
+    Console.bLocked = False;
+    for(W = FirstChildWindow; W != None; W = Next)
+    {
+        Next = W.NextSiblingWindow;
+        if(W != Home && W != MenuBar && W != StatusBar) W.HideWindow();
+    }
+}
+
 function bool HasDialog()
 {
     local UWindowWindow W;
@@ -316,6 +362,7 @@ function Tick(float Delta)
         Home.ShowWindow();
         Home.FocusWindow();
     }    if(DialogScreen != None && DialogScreen.bWindowVisible) MenuBar.HideWindow();
+    CheckBlankMenu(Delta);
 
 }
 

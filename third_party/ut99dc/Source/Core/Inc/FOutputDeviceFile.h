@@ -82,6 +82,11 @@ public:
 					WriteRaw( Data );
 					WriteRaw( LINE_TERMINATOR );
 #endif
+#if defined(__ANDROID__) || defined(PLATFORM_ANDROID)
+					// Android stops the game process without a clean exit, which
+					// dropped the last 64 KB of buffered log lines.
+					LogAr->Flush();
+#endif
 				}
 				if( GLogHook )
 					GLogHook->Serialize( Data, Event );

@@ -4,6 +4,15 @@ Each release ships two signed APKs: **console-menu** (console/phone menu) and
 **classic-menu** (original UT99 menu). Engine fixes apply to both. Releases are
 published on [the releases page](https://github.com/tib-kpl/UT99-Android/releases).
 
+## 2.3.12
+
+- Console menu: if a campaign screen disappears after a match and only the
+  blurred backdrop is left while the menu is locked, the menu brings the
+  campaign screen back after 3 seconds, or falls back to the main menu, and
+  logs the windows it found.
+- The engine log (`System/UT99Android.log`) is written line by line, so the
+  last lines are kept when Android stops a frozen game.
+
 ## 2.3.11
 
 - Console menu: edit boxes and combos redrawn as dark panels with a gold
