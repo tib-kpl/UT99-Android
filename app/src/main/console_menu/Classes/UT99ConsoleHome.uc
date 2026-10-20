@@ -265,6 +265,7 @@ function ActivateRow()
                 M.bOpenLAN = I == M.LAN;
                 M.bOpenLocation = I == M.OpenLocation;
                 M.LoadUBrowser();
+                UT99ConsoleRoot(Root).WrapNativeDialogs();
                 return;
             }
             Page.BeforeExecuteItem(I);

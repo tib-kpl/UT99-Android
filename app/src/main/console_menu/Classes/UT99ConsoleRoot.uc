@@ -259,6 +259,29 @@ function bool HasDialog()
     return False;
 }
 
+// Any remaining framed screen gets the same header and navigation. Complex
+// server/console panels are clipped into the new frame, retaining their logic.
+// Also called right after opening the server browser, so its desktop window is
+// never drawn for a frame before the console page covers it.
+function WrapNativeDialogs()
+{
+    local UWindowWindow W;
+    for(W = FirstChildWindow; W != None; W = W.NextSiblingWindow)
+        if(UWindowFramedWindow(W) != None && W.bWindowVisible && W != MenuBar)
+        {
+            // Server browser tabs can show their untitled floating info window
+            // when first created. The console server page draws those details
+            // itself, so hide it instead of wrapping it in an empty page.
+            if(W.IsA('UBrowserInfoWindow'))
+                W.HideWindow();
+            else if(W.IsA('UBrowserMainWindow'))
+                DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleServers', 0, 0, WinWidth, WinHeight, W));
+            else
+                DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleDialog', 0, 0, WinWidth, WinHeight, W));
+            break;
+        }
+}
+
 function Tick(float Delta)
 {
     local UMenuBotmatchWindow MatchWindow;
@@ -328,22 +351,7 @@ function Tick(float Delta)
         if(ListWindow != None && ListWindow.bWindowVisible)
             ListsScreen = UT99ConsoleLists(CreateWindow(class'UT99ConsoleLists', 0, 0, WinWidth, WinHeight, ListWindow));
     }
-    // Any remaining framed screen gets the same header and navigation. Complex
-    // server/console panels are clipped into the new frame, retaining their logic.
-    for(W = FirstChildWindow; W != None; W = W.NextSiblingWindow)
-        if(UWindowFramedWindow(W) != None && W.bWindowVisible && W != MenuBar)
-        {
-            // Server browser tabs can show their untitled floating info window
-            // when first created. The console server page draws those details
-            // itself, so hide it instead of wrapping it in an empty page.
-            if(W.IsA('UBrowserInfoWindow'))
-                W.HideWindow();
-            else if(W.IsA('UBrowserMainWindow'))
-                DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleServers', 0, 0, WinWidth, WinHeight, W));
-            else
-                DialogScreen = UT99ConsoleDialog(CreateWindow(class'UT99ConsoleDialog', 0, 0, WinWidth, WinHeight, W));
-            break;
-        }
+    WrapNativeDialogs();
     if(HasDialog() || Console.bQuickKeyEnable || Console.bLocked)
     {
         if(Home.bWindowVisible)

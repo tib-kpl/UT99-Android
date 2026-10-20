@@ -4,6 +4,12 @@ Each release ships two signed APKs: **console-menu** (console/phone menu) and
 **classic-menu** (original UT99 menu). Engine fixes apply to both. Releases are
 published on [the releases page](https://github.com/tib-kpl/UT99-Android/releases).
 
+## 2.3.14
+
+- No more flash of the desktop server browser the first time LAN or Internet
+  games are opened in a session: the console page now covers the browser in
+  the same step that opens it.
+
 ## 2.3.13
 
 - Fixed the console menu freezing on the blurred backdrop after a won
