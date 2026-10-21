@@ -2807,6 +2807,7 @@ static UBOOL UT99AndroidUWindowMoveMouseV169E( UNSDLViewport* Viewport, INT Mous
     if( OutUIY ) *OutUIY = UIY;
 
     UT99AndroidMenuTouchRetargetV169B( Viewport, MouseX, MouseY );
+    UT99AndroidSetWindowConsoleMouseUIV169E( UIX, UIY );
 
     UFunction* MoveMouse = Root->FindFunction( FName(TEXT("MoveMouse"), FNAME_Find) );
     if( MoveMouse )
@@ -4822,6 +4823,7 @@ UBOOL UNSDLViewport::TickInput()
                 0.0f, (FLOAT)Max( 1, SizeX - 1 ) );
             WindowsMouseY = Clamp( OldMouseY * (FLOAT)SizeY / (FLOAT)OldSizeY,
                 0.0f, (FLOAT)Max( 1, SizeY - 1 ) );
+            UT99AndroidSetWindowConsoleMouseV91( WindowsMouseX, WindowsMouseY );
 
             // Drop coordinates and press ownership from the former resolution.
             GUT99V111NativeMouseHadLast = 0;
@@ -5183,6 +5185,7 @@ while( SDL_PollEvent( &Ev ) )
                         WindowsMouseX = MouseX;
                         WindowsMouseY = MouseY;
                         bWindowsMouseAvailable = 0;
+                        UT99AndroidSetWindowConsoleMouseV91( MouseX, MouseY );
                         if( Client && Client->Engine )
                             Client->Engine->MousePosition( this, 0, MouseX, MouseY );
                         CauseInputEvent( MouseButtonMap[Ev.button.button], ( Ev.type == SDL_MOUSEBUTTONDOWN ) ? IST_Press : IST_Release );
@@ -5499,6 +5502,7 @@ while( SDL_PollEvent( &Ev ) )
                 WindowsMouseX = MouseX;
                 WindowsMouseY = MouseY;
                 bWindowsMouseAvailable = 1;
+                UT99AndroidSetWindowConsoleMouseV91( MouseX, MouseY );
                 GUT99AndroidTouchMouseDownV32 = 1;
                 GUT99AndroidTouchMouseHadLastV32 = 1;
                 GUT99AndroidTouchMouseLastXV32 = MouseX;
