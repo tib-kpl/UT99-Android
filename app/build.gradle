@@ -39,10 +39,11 @@ android {
         automotive {
             dimension 'platform'
             applicationId 'com.ast.ut99android'
-            // The previous dedicated Automotive build already used API 21.
+            // Google Play automatic protection requires API 24 or higher.
+            // Every Play-enabled AAOS car runs Android 9 (API 28) or newer.
             // Keeping this separate prevents the AAOS artifact from inheriting
             // the Jelly Bean native baseline needed only by Normal/OUYA.
-            minSdk 21
+            minSdk 24
         }
     }
 
@@ -56,8 +57,8 @@ android {
     defaultConfig {
         buildConfigField 'boolean', 'CONSOLE_MENU', 'true'
         targetSdk 35
-        versionCode 35
-        versionName '2.3.14'
+        versionCode 36
+        versionName '2.3.15'
 
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a'

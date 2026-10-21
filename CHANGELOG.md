@@ -4,6 +4,16 @@ Each release ships two signed APKs: **console-menu** (console/phone menu) and
 **classic-menu** (original UT99 menu). Engine fixes apply to both. Releases are
 published on [the releases page](https://github.com/tib-kpl/UT99-Android/releases).
 
+## 2.3.15
+
+- Integrated upstream 2.3.0 performance and stability updates: controller input,
+  mouse and touchpad menu pointers, audio threading and texture filtering.
+- Kept this fork's console menu, classic menu, OldUnreal compatibility and
+  Android settings while resolving the shared viewport and rounding changes.
+- Raised the separate Automotive build's minimum Android API to 24, as upstream
+  requires for Google Play automatic protection. Both regular menu APKs keep
+  their Android 4.1 / API 16 baseline.
+
 ## 2.3.14
 
 - No more flash of the desktop server browser the first time LAN or Internet
