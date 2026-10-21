@@ -23,6 +23,8 @@ and a controller-first console menu.
 ![Controller](https://img.shields.io/badge/Controls-Gamepad%2FTouch%2FKeyb-blueviolet)
 ![Multiplayer](https://img.shields.io/badge/Multiplayer-LAN%20%2B%20Internet%20(436)-blueviolet)
 ![AI](https://img.shields.io/badge/AI-assisted%20coding-6e7781)
+[![Join The Lair on Discord](https://img.shields.io/badge/Discord-The%20Lair-5865F2?logo=discord&logoColor=white)](https://discord.gg/AB3WVBqD5G)
+[![Support via PayPal](https://img.shields.io/badge/Support%20via-PayPal-0070BA?logo=paypal&logoColor=white)](https://paypal.me/andiweli)
 
 > [!NOTE]
 > **French translation.** The game plays in French when the app's language is French
