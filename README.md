@@ -78,7 +78,7 @@ replaces the other and keeps your data and settings.
 
 **In-game Android settings** — **Select + Start** (either order) opens the
 blue gunmetal/red Tournament-themed menu, shared by both menu variants.
-**L1/R1** switch tabs, the D-pad/stick navigates, **A** confirms and **B** goes back.
+**L1/R1** switch categories, the D-pad/stick navigates, **A** confirms and **B** goes back.
 Settings open as a modal panel over the paused game, without page transitions.
 Each option shows its default; a confirmed reset preserves touch layouts and game data.
 **F10** opens it with a keyboard. The existing small gear at the top right is

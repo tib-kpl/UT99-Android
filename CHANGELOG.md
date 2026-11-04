@@ -4,6 +4,13 @@ Each release ships two signed APKs: **console-menu** (console/phone menu) and
 **classic-menu** (original UT99 menu). Engine fixes apply to both. Releases are
 published on [the releases page](https://github.com/tib-kpl/UT99-Android/releases).
 
+## 2.3.17
+
+- Refine the in-game settings overlay with a branded navigation rail, drawn
+  category icons, compact setting cards and right-aligned values/defaults.
+- Use consistent sliders and clearer controller focus with theme-matched
+  confirmations. Keep the instant overlay, pause/resume and all existing options.
+
 ## 2.3.16
 
 - Replace the Android settings list with a blue gunmetal/red Tournament-themed

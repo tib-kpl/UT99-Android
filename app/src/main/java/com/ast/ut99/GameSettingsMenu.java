@@ -1,35 +1,34 @@
 package com.ast.ut99;
 
 import android.app.Activity;
-import android.app.Dialog;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.graphics.*;
 import android.graphics.drawable.*;
 import android.os.Build;
-import android.text.SpannableString;
-import android.text.Spanned;
-import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
+import android.text.TextUtils;
 import android.view.*;
 import android.widget.*;
 import java.util.ArrayList;
 import java.util.Locale;
 import org.libsdl.app.SDLActivity;
 
-/** Code-drawn game-themed settings, shared in design with the UT99 port. API 16+. */
+/** Instant, controller-first settings over the paused game. All graphics are code-drawn. API 16+. */
 final class GameSettingsMenu extends Dialog {
     interface Result { void complete(int action); }
     interface Choice { void changed(int index); }
     interface Level { void changed(int progress); }
     private final Activity activity;
     private final boolean tournament, french;
-    private final int accent, ink = 0xffeae4d8;
+    private final int accent, ink = 0xffeeeae1, muted = 0xffa5a8aa;
     private final ArrayList<String> names = new ArrayList<>();
     private final ArrayList<Runnable> pages = new ArrayList<>();
     private final ArrayList<Button> tabs = new ArrayList<>();
+    private final ArrayList<MenuGlyph> glyphs = new ArrayList<>();
     private LinearLayout rows;
     private ScrollView scroll;
-    private int tab;
+    private TextView pageTitle;
+    private int tab, railWidth;
     private boolean selectHeld, startHeld, backHeld, confirmHeld;
     private long lastAxis;
     private int axisDirection;
@@ -38,14 +37,18 @@ final class GameSettingsMenu extends Dialog {
     GameSettingsMenu(Activity activity, boolean tournament) {
         super(activity, android.R.style.Theme_Translucent_NoTitleBar_Fullscreen);
         this.activity = activity;
-        setCanceledOnTouchOutside(false);
         this.tournament = tournament;
         french = "fr".equalsIgnoreCase(activity.getResources().getConfiguration().locale.getLanguage());
-        accent = tournament ? 0xffec625a : 0xffd2aa65;
+        accent = tournament ? 0xffef7768 : 0xffd9b779;
+        setCanceledOnTouchOutside(false);
     }
 
     private String text(String fr, String en) { return french ? fr : en; }
     private int dp(float value) { return Math.round(value * activity.getResources().getDisplayMetrics().density); }
+    private Typeface face(boolean heading) {
+        return Typeface.create(heading && !tournament ? "serif" : tournament && heading ? "sans-serif-condensed" : "sans-serif-medium",
+                heading ? Typeface.BOLD : Typeface.NORMAL);
+    }
     int selectedTab() { return tab; }
     void refresh() { select(tab, true); }
     void page(String name, Runnable build) { names.add(name); pages.add(build); }
@@ -57,121 +60,201 @@ final class GameSettingsMenu extends Dialog {
         window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         WindowManager.LayoutParams attributes = window.getAttributes();
-        attributes.dimAmount = .55f;
+        attributes.dimAmount = .58f;
         attributes.windowAnimations = 0;
         window.setAttributes(attributes);
-        window.setWindowAnimations(0);
         FrameLayout frame = new FrameLayout(activity);
-        frame.setBackgroundColor(Color.TRANSPARENT);
-        // Insets are handled by the window; do not draw controls under cutouts/system bars.
         frame.setFitsSystemWindows(true);
+        int width = activity.getResources().getConfiguration().screenWidthDp;
+        railWidth = width < 560 ? 132 : width < 700 ? 160 : 184;
+
         LinearLayout panel = new LinearLayout(activity);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackground(new Backdrop());
-        panel.setPadding(dp(16), dp(8), dp(16), dp(8));
+        panel.setOrientation(LinearLayout.HORIZONTAL);
+        panel.setBackground(new PanelBackdrop());
         FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(-1, -1);
-        panelParams.setMargins(dp(24), dp(18), dp(24), dp(18));
+        panelParams.setMargins(dp(28), dp(18), dp(28), dp(18));
         frame.addView(panel, panelParams);
 
-        LinearLayout header = new LinearLayout(activity);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout titles = new LinearLayout(activity);
-        titles.setOrientation(LinearLayout.VERTICAL);
-        TextView wordmark = label(title, 25, accent);
-        wordmark.setTypeface(Typeface.create(tournament ? "sans-serif-condensed" : "serif", Typeface.BOLD));
-        titles.addView(wordmark);
-        titles.addView(label(subtitle, 12, 0xffa8acb4));
-        header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
-        Button back = action(text("Reprendre", "Resume"), this::dismiss);
-        header.addView(back, new LinearLayout.LayoutParams(-2, dp(48)));
-        panel.addView(header);
+        LinearLayout rail = new LinearLayout(activity);
+        rail.setOrientation(LinearLayout.VERTICAL);
+        rail.setPadding(dp(16), dp(20), dp(16), dp(14));
+        panel.addView(rail, new LinearLayout.LayoutParams(dp(railWidth), -1));
+        LinearLayout brand = new LinearLayout(activity);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView emblem = new ImageView(activity);
+        emblem.setImageDrawable(new MenuGlyph(-1, accent));
+        brand.addView(emblem, new LinearLayout.LayoutParams(dp(34), dp(38)));
+        LinearLayout wordmark = new LinearLayout(activity);
+        wordmark.setOrientation(LinearLayout.VERTICAL);
+        wordmark.setPadding(dp(10), 0, 0, 0);
+        TextView unreal = label("UNREAL", width < 560 ? 15 : 19, ink);
+        unreal.setTypeface(face(true));
+        wordmark.addView(unreal);
+        String edition = tournament ? "TOURNAMENT" : title.contains("GOLD") ? "GOLD" : "CLASSIC";
+        TextView editionLabel = label(edition, width < 560 ? 10 : 11, accent);
+        editionLabel.setSingleLine(true);
+        editionLabel.setEllipsize(TextUtils.TruncateAt.END);
+        editionLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        if (Build.VERSION.SDK_INT >= 21) editionLabel.setLetterSpacing(.12f);
+        wordmark.addView(editionLabel);
+        brand.addView(wordmark, new LinearLayout.LayoutParams(0, -2, 1));
+        rail.addView(brand);
+        TextView overline = label(text("PARAMÈTRES", "SETTINGS"), 11, muted);
+        overline.setPadding(dp(10), dp(20), 0, dp(10));
+        rail.addView(overline);
 
-        HorizontalScrollView tabScroll = new HorizontalScrollView(activity);
-        tabScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout strip = new LinearLayout(activity);
         for (int i = 0; i < names.size(); i++) {
             final int index = i;
             Button button = action(names.get(i), () -> select(index, true));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(48));
-            lp.setMargins(0, dp(6), dp(6), dp(6));
-            strip.addView(button, lp);
+            button.setTextSize(13);
+            button.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+            button.setPadding(dp(12), 0, dp(8), 0);
+            button.setBackground(railBackground());
+            MenuGlyph glyph = new MenuGlyph(kind(names.get(i)), muted);
+            glyph.setBounds(0, 0, dp(18), dp(18));
+            if (width >= 560) button.setCompoundDrawables(glyph, null, null, null);
+            button.setCompoundDrawablePadding(dp(10));
+            glyphs.add(glyph);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(48));
+            lp.bottomMargin = dp(5);
+            rail.addView(button, lp);
             tabs.add(button);
         }
-        tabScroll.addView(strip);
-        panel.addView(tabScroll);
+        rail.addView(new View(activity), new LinearLayout.LayoutParams(1, 0, 1));
+        Button resume = action(text("Reprendre", "Resume"), this::dismiss);
+        resume.setBackground(primaryBackground());
+        resume.setTextColor(tournament ? 0xff291817 : 0xff292218);
+        rail.addView(resume, new LinearLayout.LayoutParams(-1, dp(46)));
+        TextView close = label("Select + Start", 11, muted);
+        close.setGravity(Gravity.CENTER);
+        close.setPadding(0, dp(9), 0, 0);
+        rail.addView(close);
+
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(22), dp(18), dp(22), dp(12));
+        panel.addView(content, new LinearLayout.LayoutParams(0, -1, 1));
+        LinearLayout heading = new LinearLayout(activity);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout pageHeading = new LinearLayout(activity);
+        pageHeading.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = label(text("OPTIONS DU JEU", "GAME OPTIONS"), 11, accent);
+        if (Build.VERSION.SDK_INT >= 21) eyebrow.setLetterSpacing(.12f);
+        pageHeading.addView(eyebrow);
+        pageTitle = label("", 24, ink);
+        pageTitle.setTypeface(face(true));
+        pageHeading.addView(pageTitle);
+        heading.addView(pageHeading, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView shoulders = label("L1   /   R1", 11, muted);
+        shoulders.setPadding(dp(10), dp(7), dp(10), dp(7));
+        shoulders.setBackground(plate(0xff24272b, 0xff383b3d));
+        heading.addView(shoulders);
+        content.addView(heading);
+        View divider = new View(activity);
+        divider.setBackgroundColor(0xff3a3b3b);
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+        dividerParams.topMargin = dp(12); dividerParams.bottomMargin = dp(5);
+        content.addView(divider, dividerParams);
+
         scroll = new ScrollView(activity);
         scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.setSmoothScrollingEnabled(false);
         rows = new LinearLayout(activity);
         rows.setOrientation(LinearLayout.VERTICAL);
-        rows.setPadding(dp(2), dp(4), dp(2), dp(8));
+        rows.setPadding(dp(1), 0, dp(1), dp(6));
         scroll.addView(rows);
-        panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        TextView hint = label(text("L1 / R1 : onglets   •   A : valider   •   B : retour   •   Select + Start : fermer",
-                "L1 / R1: tabs   •   A: confirm   •   B: back   •   Select + Start: close"), 11, 0xffa8acb4);
-        hint.setPadding(0, dp(6), 0, 0);
-        panel.addView(hint);
+        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        TextView hint = label(text("A  Choisir       ← →  Ajuster       B  Reprendre",
+                "A  Select       ← →  Adjust       B  Resume"), 11, muted);
+        hint.setPadding(0, dp(10), 0, 0);
+        content.addView(hint);
         setContentView(frame);
-        // PhoneWindow resolves its theme during setContentView; clear animation afterwards.
+        // PhoneWindow resolves theme animations during setContentView, so clear them afterwards.
         window.setWindowAnimations(0);
         SDLActivity.mNextNativeState = SDLActivity.NativeState.PAUSED;
         SDLActivity.handleNativeState();
         super.show();
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        if (Build.VERSION.SDK_INT >= 19) frame.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        select(Math.max(0, Math.min(initial, pages.size() - 1)), false);
-        back.requestFocus();
+        immersive(window);
+        select(Math.max(0, Math.min(initial, pages.size() - 1)), true);
+    }
+
+    private void immersive(Window window) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (Build.VERSION.SDK_INT >= 19) window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
     private void select(int index, boolean focusRows) {
         tab = index;
         activity.getPreferences(0).edit().putInt(tabPreference, index).apply();
+        pageTitle.setText(names.get(tab));
         for (int i = 0; i < tabs.size(); i++) {
-            tabs.get(i).setTextColor(i == tab ? accent : ink);
+            tabs.get(i).setTextColor(i == tab ? accent : muted);
             tabs.get(i).setSelected(i == tab);
+            glyphs.get(i).color(i == tab ? accent : muted);
         }
         rows.removeAllViews();
         pages.get(tab).run();
         scroll.scrollTo(0, 0);
         if (focusRows) {
-            View first = rows.getFocusables(View.FOCUS_FORWARD).isEmpty() ? null
-                    : rows.getFocusables(View.FOCUS_FORWARD).get(0);
-            if (first != null) first.post(() -> first.requestFocus());
+            ArrayList<View> focusables = rows.getFocusables(View.FOCUS_FORWARD);
+            if (!focusables.isEmpty()) focusables.get(0).post(() -> focusables.get(0).requestFocus());
         }
     }
 
     private TextView label(String value, int size, int color) {
         TextView view = new TextView(activity);
-        view.setText(value);
-        view.setTextSize(size);
-        view.setTextColor(color);
+        view.setText(value); view.setTextSize(size); view.setTextColor(color);
+        view.setIncludeFontPadding(false);
         return view;
     }
 
     void section(String value) {
-        TextView view = label(value.toUpperCase(Locale.ROOT), 13, accent);
-        view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        view.setPadding(dp(4), dp(10), 0, dp(6));
-        rows.addView(view);
+        LinearLayout heading = new LinearLayout(activity);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.setPadding(dp(2), dp(14), 0, dp(8));
+        TextView title = label(value.toUpperCase(Locale.ROOT), 11, accent);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        heading.addView(title);
+        View rule = new View(activity);
+        rule.setBackgroundColor(0xff333637);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(1), 1);
+        lp.leftMargin = dp(12);
+        heading.addView(rule, lp);
+        rows.addView(heading);
     }
 
     void note(String value) {
-        TextView view = label(value, 13, 0xffaeb4be);
-        view.setPadding(dp(6), dp(4), dp(6), dp(10));
+        TextView view = label(value, 12, muted);
+        view.setLineSpacing(dp(2), 1);
+        view.setPadding(dp(4), dp(2), dp(4), dp(9));
         rows.addView(view);
     }
 
     void path(String value) {
-        TextView view = label(value, 13, 0xffaeb4be);
+        TextView view = label(value, 12, muted);
         view.setTypeface(Typeface.MONOSPACE);
-        view.setPadding(dp(6), dp(4), dp(6), dp(10));
+        view.setPadding(dp(12), dp(12), dp(12), dp(12));
+        view.setBackground(cardBackground());
         view.setTextIsSelectable(true);
-        rows.addView(view);
+        addRow(view);
     }
 
     void confirm(String message, String accept, Runnable confirmed) {
+        LinearLayout body = new LinearLayout(activity);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(24), dp(22), dp(24), dp(12));
+        TextView title = label(text("CONFIRMATION", "CONFIRMATION"), 11, accent);
+        title.setPadding(0, 0, 0, dp(12));
+        body.addView(title);
+        TextView copy = label(message, 16, ink);
+        copy.setLineSpacing(dp(3), 1);
+        body.addView(copy);
         AlertDialog dialog = new AlertDialog.Builder(activity, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                .setMessage(message).setNegativeButton(android.R.string.cancel, null)
+                .setView(body).setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(accept, (d, which) -> confirmed.run()).create();
         dialog.setOnKeyListener((d, key, event) -> {
             if (key == KeyEvent.KEYCODE_BUTTON_A) {
@@ -191,87 +274,137 @@ final class GameSettingsMenu extends Dialog {
         dialog.getWindow().setWindowAnimations(0);
         dialog.show();
         dialog.getWindow().setWindowAnimations(0);
-        dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        if (Build.VERSION.SDK_INT >= 19) dialog.getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        dialog.getWindow().setBackgroundDrawable(plate(tournament ? 0xff233449 : 0xff302c26, accent));
+        immersive(dialog.getWindow());
+        dialog.getWindow().setBackgroundDrawable(plate(tournament ? 0xff1c242e : 0xff27241f, 0xff55524b));
         for (int which : new int[]{AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_POSITIVE}) {
             Button button = dialog.getButton(which);
             button.setFocusableInTouchMode(true);
-            button.setTextColor(ink);
-            button.setAllCaps(false);
-            button.setBackground(background());
+            button.setTextSize(14); button.setTextColor(ink); button.setAllCaps(false);
+            button.setPadding(dp(18), dp(8), dp(18), dp(8));
+            button.setBackground(cardBackground());
+            if (Build.VERSION.SDK_INT >= 21) button.setStateListAnimator(null);
         }
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
     }
 
     private GradientDrawable plate(int fill, int stroke) {
         GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{fill, tournament ? 0xff101a29 : 0xff181715});
-        drawable.setCornerRadius(dp(3));
-        drawable.setStroke(dp(1), stroke);
+                new int[]{fill, tournament ? 0xff141c25 : 0xff1b1b18});
+        drawable.setCornerRadius(dp(6)); drawable.setStroke(dp(1), stroke);
         return drawable;
     }
 
-    private StateListDrawable background() {
+    private StateListDrawable cardBackground() {
         StateListDrawable drawable = new StateListDrawable();
-        drawable.addState(new int[]{android.R.attr.state_pressed}, plate(0xff575047, accent));
-        drawable.addState(new int[]{android.R.attr.state_focused}, plate(tournament ? 0xff3b2833 : 0xff433a2c, accent));
-        drawable.addState(new int[]{android.R.attr.state_selected}, plate(0xff30323a, accent));
-        drawable.addState(new int[]{}, plate(tournament ? 0xff233449 : 0xff302c26, 0xff50515a));
+        drawable.addState(new int[]{android.R.attr.state_pressed}, plate(tournament ? 0xff473134 : 0xff4c402c, accent));
+        drawable.addState(new int[]{android.R.attr.state_focused}, plate(tournament ? 0xff38282e : 0xff3c3426, accent));
+        drawable.addState(new int[]{android.R.attr.state_selected}, plate(tournament ? 0xff38282e : 0xff3c3426, accent));
+        drawable.addState(new int[]{}, plate(tournament ? 0xff222b35 : 0xff2b2a25, 0xff3b3e3f));
+        return drawable;
+    }
+
+    private StateListDrawable railBackground() {
+        StateListDrawable drawable = new StateListDrawable();
+        drawable.addState(new int[]{android.R.attr.state_focused}, new RailPlate(true, true));
+        drawable.addState(new int[]{android.R.attr.state_pressed}, new RailPlate(true, true));
+        drawable.addState(new int[]{android.R.attr.state_selected}, new RailPlate(true, false));
+        drawable.addState(new int[]{}, new RailPlate(false, false));
+        return drawable;
+    }
+
+    private StateListDrawable primaryBackground() {
+        StateListDrawable drawable = new StateListDrawable();
+        GradientDrawable normal = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{accent, tournament ? 0xffc35a4d : 0xffb78f50});
+        normal.setCornerRadius(dp(5));
+        GradientDrawable focused = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{tournament ? 0xffffa18e : 0xfff5d89f, accent});
+        focused.setCornerRadius(dp(5)); focused.setStroke(dp(2), ink);
+        drawable.addState(new int[]{android.R.attr.state_focused}, focused);
+        drawable.addState(new int[]{android.R.attr.state_pressed}, focused);
+        drawable.addState(new int[]{}, normal);
         return drawable;
     }
 
     private Button action(String value, Runnable clicked) {
         Button button = new Button(activity);
-        button.setFocusable(true);
-        button.setFocusableInTouchMode(true);
-        button.setText(value);
-        button.setTextSize(14);
-        button.setAllCaps(false);
-        button.setTextColor(ink);
-        button.setMinHeight(dp(48));
-        button.setMinimumHeight(dp(48));
-        button.setPadding(dp(14), dp(6), dp(14), dp(6));
-        button.setBackground(background());
+        button.setFocusable(true); button.setFocusableInTouchMode(true);
+        button.setText(value); button.setTextSize(14); button.setAllCaps(false); button.setTextColor(ink);
+        button.setTypeface(face(false)); button.setMinHeight(0); button.setMinimumHeight(0);
+        button.setPadding(dp(12), dp(8), dp(12), dp(8));
+        button.setBackground(cardBackground());
+        if (Build.VERSION.SDK_INT >= 21) button.setStateListAnimator(null);
         button.setOnClickListener(v -> clicked.run());
         return button;
     }
 
+    private LinearLayout card(boolean focusable) {
+        LinearLayout card = new LinearLayout(activity);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(11), dp(14), dp(11));
+        card.setMinimumHeight(dp(58));
+        card.setBackground(cardBackground());
+        card.setFocusable(focusable); card.setFocusableInTouchMode(focusable);
+        return card;
+    }
+
     void button(String value, Runnable clicked) {
-        Button button = action(value + "   ›", clicked);
-        button.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-        addRow(button);
+        LinearLayout row = card(true);
+        row.setMinimumHeight(dp(48));
+        TextView caption = label(value.replace("…", ""), 14, ink);
+        caption.setTypeface(face(false));
+        row.addView(caption, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView arrow = label("›", 24, accent);
+        arrow.setPadding(dp(12), 0, 0, 0);
+        row.addView(arrow);
+        row.setContentDescription(value);
+        row.setOnClickListener(v -> clicked.run());
+        addRow(row);
     }
 
     private void addRow(View view) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.bottomMargin = dp(6);
+        lp.bottomMargin = dp(7);
         rows.addView(view, lp);
     }
 
-    private CharSequence withDefault(String primary, String value) {
-        String hint = text("Par défaut : ", "Default: ") + value;
-        SpannableString result = new SpannableString(primary + "\n" + hint);
-        int start = primary.length() + 1;
-        result.setSpan(new ForegroundColorSpan(0xffaeb4be), start, result.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        result.setSpan(new RelativeSizeSpan(.82f), start, result.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return result;
+    private String shortValue(String value) {
+        int separator = value.indexOf(" · ");
+        if (separator < 0 && (value.startsWith("Automatique") || value.startsWith("Automatic"))) separator = value.indexOf(" / ");
+        return separator < 0 ? value : value.substring(0, separator);
+    }
+
+    private LinearLayout settingLabel(String title, String defaultValue) {
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        TextView caption = label(title, 14, ink);
+        caption.setTypeface(face(false));
+        labels.addView(caption);
+        TextView hint = label(text("Défaut : ", "Default: ") + shortValue(defaultValue), 11, muted);
+        hint.setPadding(0, dp(5), 0, 0);
+        labels.addView(hint);
+        return labels;
     }
 
     void choice(String title, String[] values, int initial, int defaultIndex, Choice changed) {
         final int[] current = {Math.max(0, Math.min(initial, values.length - 1))};
-        final Button button = action("", () -> {});
+        LinearLayout row = card(true);
+        row.addView(settingLabel(title, values[defaultIndex]), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView value = label("", 14, accent);
+        value.setTypeface(face(false)); value.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        value.setMaxLines(2); value.setEllipsize(TextUtils.TruncateAt.END);
+        value.setPadding(dp(8), 0, 0, 0);
+        row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
         Runnable update = () -> {
-            button.setText(withDefault(title + "\n‹   " + values[current[0]] + "   ›", values[defaultIndex]));
-            button.setContentDescription(title + ": " + values[current[0]] + ". " + text("Par défaut : ", "Default: ") + values[defaultIndex]);
+            value.setText("‹  " + shortValue(values[current[0]]) + "  ›");
+            row.setContentDescription(title + ": " + values[current[0]] + ". " + text("Par défaut : ", "Default: ") + values[defaultIndex]);
         };
-        button.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-        button.setOnClickListener(v -> {
+        row.setOnClickListener(v -> {
             current[0] = (current[0] + 1) % values.length;
             changed.changed(current[0]); update.run();
         });
-        button.setOnKeyListener((v, key, event) -> {
+        row.setOnKeyListener((v, key, event) -> {
             if (key != KeyEvent.KEYCODE_DPAD_LEFT && key != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 current[0] = (current[0] + (key == KeyEvent.KEYCODE_DPAD_LEFT ? values.length - 1 : 1)) % values.length;
@@ -279,43 +412,48 @@ final class GameSettingsMenu extends Dialog {
             }
             return true;
         });
-        update.run(); addRow(button);
+        update.run(); addRow(row);
     }
 
     void slider(String title, int max, int initial, int defaultIndex, String[] values, Level changed) {
-        TextView caption = label("", 14, ink);
-        caption.setText(withDefault(title + "  " + values[initial], values[defaultIndex]));
-        caption.setPadding(dp(6), dp(8), 0, 0);
-        rows.addView(caption);
+        LinearLayout card = card(false);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(11), dp(14), dp(4));
+        LinearLayout header = new LinearLayout(activity);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(settingLabel(title, values[defaultIndex]), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView current = label(values[initial], 18, accent);
+        current.setTypeface(face(false));
+        current.setPadding(dp(12), 0, 0, 0);
+        header.addView(current);
+        card.addView(header, new LinearLayout.LayoutParams(-1, -2));
         SeekBar bar = new SeekBar(activity);
         bar.setFocusable(true); bar.setFocusableInTouchMode(true);
-        StateListDrawable sliderFocus = new StateListDrawable();
-        sliderFocus.addState(new int[]{android.R.attr.state_focused}, plate(tournament ? 0xff3b2833 : 0xff433a2c, accent));
-        sliderFocus.addState(new int[]{android.R.attr.state_pressed}, plate(tournament ? 0xff3b2833 : 0xff433a2c, accent));
-        sliderFocus.addState(new int[]{}, new ColorDrawable(Color.TRANSPARENT));
-        bar.setBackground(sliderFocus);
-        LayerDrawable track = new LayerDrawable(new Drawable[]{new SliderTrack(0xff484438),
+        bar.setBackgroundColor(Color.TRANSPARENT);
+        // The card carries focus; Android's fallback highlight would cover the track in grey.
+        if (Build.VERSION.SDK_INT >= 26) bar.setDefaultFocusHighlightEnabled(false);
+        bar.setPadding(dp(5), 0, dp(5), 0);
+        bar.setOnFocusChangeListener((v, focused) -> card.setSelected(focused));
+        LayerDrawable track = new LayerDrawable(new Drawable[]{new SliderTrack(0xff4d5050),
                 new ClipDrawable(new SliderTrack(accent), Gravity.LEFT, ClipDrawable.HORIZONTAL)});
-        track.setId(0, android.R.id.background);
-        track.setId(1, android.R.id.progress);
+        track.setId(0, android.R.id.background); track.setId(1, android.R.id.progress);
         bar.setProgressDrawable(track);
         GradientDrawable thumb = new GradientDrawable();
-        thumb.setShape(GradientDrawable.OVAL);
-        thumb.setColor(accent);
-        thumb.setSize(dp(14), dp(14));
-        bar.setThumb(thumb);
-        bar.setMax(max); bar.setProgress(initial);
-        bar.setContentDescription(title);
-        bar.setKeyProgressIncrement(1);
+        thumb.setShape(GradientDrawable.OVAL); thumb.setColor(accent);
+        thumb.setStroke(dp(2), tournament ? 0xfff8c6bd : 0xffffe4b0);
+        thumb.setSize(dp(12), dp(12));
+        bar.setThumb(thumb); bar.setMax(max); bar.setProgress(initial); bar.setKeyProgressIncrement(1);
+        bar.setContentDescription(title + ". " + text("Par défaut : ", "Default: ") + values[defaultIndex]);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar view, int progress, boolean fromUser) {
-                caption.setText(withDefault(title + "  " + values[progress], values[defaultIndex]));
+                current.setText(values[progress]);
                 if (fromUser) changed.changed(progress);
             }
-            public void onStartTrackingTouch(SeekBar view) { }
-            public void onStopTrackingTouch(SeekBar view) { }
+            public void onStartTrackingTouch(SeekBar view) { card.setSelected(true); }
+            public void onStopTrackingTouch(SeekBar view) { card.setSelected(view.hasFocus()); }
         });
-        rows.addView(bar, new LinearLayout.LayoutParams(-1, dp(48)));
+        card.addView(bar, new LinearLayout.LayoutParams(-1, dp(44)));
+        addRow(card);
     }
 
     boolean key(KeyEvent event) {
@@ -386,39 +524,110 @@ final class GameSettingsMenu extends Dialog {
             SDLActivity.handleNativeState();
         }
     }
-
-    /** Keep the slider independent of the engine Activity's Holo/Material theme. */
     private final class SliderTrack extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         SliderTrack(int color) { paint.setColor(color); }
         @Override public void draw(Canvas canvas) {
-            Rect bounds = getBounds();
-            float center = bounds.exactCenterY();
-            canvas.drawRect(bounds.left, center - dp(1), bounds.right, center + dp(1), paint);
+            Rect bounds = getBounds(); float center = bounds.exactCenterY();
+            canvas.drawRoundRect(new RectF(bounds.left, center - dp(1.25f), bounds.right, center + dp(1.25f)), dp(2), dp(2), paint);
         }
         @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
         @Override public void setColorFilter(ColorFilter filter) { paint.setColorFilter(filter); }
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 
-    /** Stone/bronze for Unreal, blue gunmetal/red for the Tournament. No game assets. */
-    private final class Backdrop extends Drawable {
+    private final class RailPlate extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final boolean selected, focused;
+        RailPlate(boolean selected, boolean focused) { this.selected = selected; this.focused = focused; }
+        @Override public void draw(Canvas canvas) {
+            if (!selected) return;
+            RectF box = new RectF(getBounds()); box.inset(dp(1), dp(1));
+            paint.setColor(tournament ? 0xff302429 : 0xff353024);
+            canvas.drawRoundRect(box, dp(5), dp(5), paint);
+            paint.setColor(accent);
+            canvas.drawRoundRect(new RectF(box.left, box.top + dp(10), box.left + dp(3), box.bottom - dp(10)), dp(1), dp(1), paint);
+            if (focused) {
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1)); paint.setColor(ink);
+                canvas.drawRoundRect(box, dp(5), dp(5), paint); paint.setStyle(Paint.Style.FILL);
+            }
+        }
+        @Override public void setAlpha(int alpha) { }
+        @Override public void setColorFilter(ColorFilter filter) { }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
+    private int kind(String name) {
+        String value = name.toLowerCase(Locale.ROOT);
+        if (value.contains("command") || value.contains("control")) return 0;
+        if (value.contains("confort") || value.contains("comfort")) return 1;
+        if (value.contains("affich") || value.contains("display")) return 2;
+        if (value.contains("fichier") || value.contains("data")) return 4;
+        return 3;
+    }
+
+    private final class MenuGlyph extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int kind;
+        private int color;
+        MenuGlyph(int kind, int color) { this.kind = kind; this.color = color; }
+        void color(int value) { color = value; invalidateSelf(); }
+        @Override public void draw(Canvas canvas) {
+            Rect bounds = getBounds();
+            canvas.save(); canvas.translate(bounds.left, bounds.top); canvas.scale(bounds.width() / 24f, bounds.height() / 24f);
+            paint.setColor(color); paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(1.5f);
+            paint.setStrokeJoin(Paint.Join.ROUND); paint.setStrokeCap(Paint.Cap.ROUND);
+            if (kind == -1) {
+                Path rim = new Path(); rim.moveTo(5, 1); rim.lineTo(19, 1); rim.lineTo(23, 5); rim.lineTo(23, 19);
+                rim.lineTo(19, 23); rim.lineTo(5, 23); rim.lineTo(1, 19); rim.lineTo(1, 5); rim.close();
+                canvas.drawPath(rim, paint); paint.setStyle(Paint.Style.FILL);
+                paint.setTypeface(Typeface.create("serif", Typeface.BOLD_ITALIC)); paint.setTextSize(20);
+                canvas.drawText("U", 4, 19, paint);
+            } else if (kind == 0) {
+                Path pad = new Path(); pad.moveTo(9, 3); pad.lineTo(15, 3); pad.lineTo(15, 9); pad.lineTo(21, 9);
+                pad.lineTo(21, 15); pad.lineTo(15, 15); pad.lineTo(15, 21); pad.lineTo(9, 21); pad.lineTo(9, 15);
+                pad.lineTo(3, 15); pad.lineTo(3, 9); pad.lineTo(9, 9); pad.close(); canvas.drawPath(pad, paint);
+            } else if (kind == 1) {
+                canvas.drawCircle(12, 12, 7, paint); canvas.drawCircle(12, 12, 2, paint);
+                canvas.drawLine(12, 1, 12, 6, paint); canvas.drawLine(12, 18, 12, 23, paint);
+                canvas.drawLine(1, 12, 6, 12, paint); canvas.drawLine(18, 12, 23, 12, paint);
+            } else if (kind == 2) {
+                canvas.drawRoundRect(new RectF(2, 4, 22, 17), 2, 2, paint);
+                canvas.drawLine(12, 17, 12, 21, paint); canvas.drawLine(7, 21, 17, 21, paint);
+            } else if (kind == 4) {
+                Path folder = new Path(); folder.moveTo(2, 6); folder.lineTo(10, 6); folder.lineTo(12, 9);
+                folder.lineTo(22, 9); folder.lineTo(22, 20); folder.lineTo(2, 20); folder.close(); canvas.drawPath(folder, paint);
+            } else {
+                Path diamond = new Path(); diamond.moveTo(12, 2); diamond.lineTo(22, 12); diamond.lineTo(12, 22);
+                diamond.lineTo(2, 12); diamond.close(); canvas.drawPath(diamond, paint);
+                canvas.drawCircle(12, 12, 3, paint);
+            }
+            canvas.restore();
+        }
+        @Override public void setAlpha(int alpha) { }
+        @Override public void setColorFilter(ColorFilter filter) { }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
+    private final class PanelBackdrop extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         @Override public void draw(Canvas canvas) {
             Rect bounds = getBounds();
             paint.setShader(new LinearGradient(0, 0, bounds.width(), bounds.height(),
-                    tournament ? 0xff162d48 : 0xff322b20, 0xff080b10, Shader.TileMode.CLAMP));
+                    tournament ? 0xff202832 : 0xff302d27, 0xff111518, Shader.TileMode.CLAMP));
             canvas.drawRect(bounds, paint); paint.setShader(null);
-            paint.setColor(tournament ? 0x133b7199 : 0x13bc9b62);
-            paint.setStrokeWidth(dp(1));
-            for (int y = 0; y < bounds.height(); y += dp(32)) canvas.drawLine(0, y, bounds.width(), y, paint);
-            paint.setTypeface(Typeface.create("serif", Typeface.BOLD_ITALIC));
-            paint.setTextSize(bounds.height() * .85f); paint.setColor(tournament ? 0x0e81b8e4 : 0x0ebc9b62);
-            canvas.drawText("U", bounds.width() * .66f, bounds.height() * .92f, paint);
-            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1)); paint.setColor(accent);
-            canvas.drawRect(dp(10), dp(8), bounds.width() - dp(10), bounds.height() - dp(8), paint);
-            paint.setStyle(Paint.Style.FILL);
-            canvas.drawRect(dp(10), dp(8), dp(86), dp(11), paint);
+            paint.setColor(tournament ? 0xff131a23 : 0xff1c1d1b);
+            canvas.drawRect(0, 0, dp(railWidth), bounds.height(), paint);
+            paint.setShader(new RadialGradient(bounds.width() * .85f, 0, bounds.width() * .65f,
+                    tournament ? 0x102d708c : 0x158e6d37, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+            canvas.drawRect(bounds, paint); paint.setShader(null);
+            paint.setColor(0xff3a3c3c); paint.setStrokeWidth(dp(1));
+            canvas.drawLine(dp(railWidth), dp(18), dp(railWidth), bounds.height() - dp(18), paint);
+            paint.setStyle(Paint.Style.STROKE); paint.setColor(tournament ? 0xff5c4543 : 0xff6c5c40);
+            canvas.drawRect(dp(.5f), dp(.5f), bounds.width() - dp(.5f), bounds.height() - dp(.5f), paint);
+            paint.setStyle(Paint.Style.FILL); paint.setColor(accent);
+            canvas.drawRect(0, 0, dp(railWidth), dp(2), paint);
+            canvas.drawRect(bounds.width() - dp(32), bounds.height() - dp(2), bounds.width(), bounds.height(), paint);
         }
         @Override public void setAlpha(int alpha) { }
         @Override public void setColorFilter(ColorFilter filter) { }
