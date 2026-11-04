@@ -30,6 +30,7 @@ final class AndroidSettingsPanel extends ContextWrapper {
         menu = new GameSettingsMenu(activity, true, R.drawable.menu_logo_ut99);
         menu.setOnDismissListener(dialog -> { if (!activity.isFinishing()) completed.complete(result); });
         menu.page(text("Commandes", "Controls"), this::controls);
+        menu.page(text("Confort", "Comfort"), this::comfort);
         menu.page(text("Jeu", "Game"), this::game);
         menu.page(text("Fichiers", "Game data"), this::data);
         menu.show("UNREAL TOURNAMENT", text("RÉGLAGES ANDROID  /  UT99", "ANDROID SETTINGS  /  UT99"),
@@ -52,6 +53,19 @@ final class AndroidSettingsPanel extends ContextWrapper {
                         text("Réinitialiser", "Reset"), () -> { setResult(RESET_TOUCH); finish(); }));
         menu.note(text("Select + Start ouvre ce menu à la manette. La petite icône est réservée au mode tactile.",
                 "Select + Start opens these settings with a controller. The small icon appears in touch mode only."));
+    }
+
+    private void comfort() {
+        menu.section(text("Aide à la visée · manette", "Aim assist · controller"));
+        menu.choice(text("Intensité", "Strength"), new String[]{
+                text("Désactivée", "Off"), text("Légère", "Light"),
+                text("Moyenne", "Medium"), text("Forte", "Strong")},
+                AndroidGameSettings.aimAssist(this), AndroidGameSettings.DEFAULT_AIM_ASSIST,
+                level -> AndroidGameSettings.aimAssist(this, level));
+        menu.note(text("Suit doucement un adversaire visible proche du viseur. Les coéquipiers sont exclus. Un mouvement franc du stick garde la priorité.",
+                "Gently follows a visible opponent near the crosshair. Teammates are excluded. Firm stick movement takes priority."));
+        menu.note(text("Active à la manette uniquement, après fermeture de ce menu. Aucun effet sur la visée tactile ou à la souris.",
+                "Controller only, applied when you close this menu. Touch and mouse aiming are unaffected."));
     }
 
     private void game() {

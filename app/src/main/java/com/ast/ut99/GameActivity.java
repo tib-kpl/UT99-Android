@@ -1082,6 +1082,8 @@ public class GameActivity extends SDLActivity {
 
     // UT99_ANDROID_NATIVE_INPUT_V47
     private static native void nativeAndroidButtonV47(int keyCode, boolean down);
+    private static native void nativeAimAssistSettings(int level);
+    private static native void nativeAimAssistInput(boolean controller);
     private static native void nativeAndroidAxisV47(int axis, float value);
     private static native void nativeAndroidTouchLookV101(float x, float y);
     private static native int nativeAndroidInputResetSerialRT();
@@ -1437,6 +1439,7 @@ public class GameActivity extends SDLActivity {
             settingsMenu = null;
             if (ut99RetroTouchBridge != null) ut99RetroTouchBridge.start();
             ut99V52ScheduleImmersive();
+            nativeAimAssistSettings(AndroidGameSettings.aimAssist(this));
             onSettingsResult(result);
         });
     }
@@ -1709,6 +1712,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public boolean dispatchGenericMotionEvent(android.view.MotionEvent event) {
+        if (isPhysicalMouseEventV210(event)) nativeAimAssistInput(false);
         // UT99_ANDROID_CHROMEOS_MOUSE_ACTIVITY_ROUTE_V210:
         // ChromeOS may deliver mouse hover, capture and button events to the
         // Activity/DecorView instead of the SDL Surface's generic-motion
@@ -1795,6 +1799,7 @@ public class GameActivity extends SDLActivity {
             if (ut99RetroTouchBridge != null && ut99IsRealControllerEventV231(event)) {
                 ut99RetroTouchBridge.onHardwareControllerInput();
             }
+            nativeAimAssistInput(ut99IsRealControllerEventV231(event));
             final boolean ouya = isOuyaDeviceV108();
             float lx = event.getAxisValue(android.view.MotionEvent.AXIS_X);
             float ly = event.getAxisValue(android.view.MotionEvent.AXIS_Y);
@@ -2033,6 +2038,8 @@ public class GameActivity extends SDLActivity {
             }
         }
 
+        nativeAimAssistSettings(AndroidGameSettings.aimAssist(this));
+        nativeAimAssistInput(false);
         ut99V52ScheduleImmersive(); // v52 onResume
         ut99V76HideImeUnlessRequested();
     }
@@ -2291,6 +2298,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        nativeAimAssistInput(false);
         // RetroTouch must see the current native menu state before a fresh pointer
         // is dispatched, otherwise the first UWindow tap after opening a menu can
         // be consumed by a stale GAMEPLAY mode.

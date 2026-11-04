@@ -5,7 +5,7 @@ import android.content.Context;
 /** Preferences owned by the game process, separate from launcher/import state. */
 final class AndroidGameSettings {
     static final String DEFAULT_LANGUAGE = "", DEFAULT_TOUCH = "auto";
-    static final int DEFAULT_TOUCH_OPACITY = 70;
+    static final int DEFAULT_TOUCH_OPACITY = 70, DEFAULT_AIM_ASSIST = 2;
     private static final String PREFS = "android_game_settings";
     static String language(Context context) {
         return context.getSharedPreferences(PREFS, 0).getString("language", DEFAULT_LANGUAGE);
@@ -26,9 +26,17 @@ final class AndroidGameSettings {
     static void touchOpacity(Context context, int percent) {
         context.getSharedPreferences(PREFS, 0).edit().putInt("touch_opacity", percent).commit();
     }
+    static int aimAssist(Context context) {
+        return Math.max(0, Math.min(3, context.getSharedPreferences(PREFS, 0)
+                .getInt("aim_assist", DEFAULT_AIM_ASSIST)));
+    }
+    static void aimAssist(Context context, int level) {
+        context.getSharedPreferences(PREFS, 0).edit()
+                .putInt("aim_assist", Math.max(0, Math.min(3, level))).commit();
+    }
     /** Keep layout/editor preferences and launcher/data state intact. */
     static void resetDefaults(Context context) {
         context.getSharedPreferences(PREFS, 0).edit().remove("language").remove("touch")
-                .remove("touch_opacity").commit();
+                .remove("touch_opacity").remove("aim_assist").commit();
     }
 }

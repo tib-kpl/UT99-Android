@@ -1,3 +1,6 @@
+#ifdef PLATFORM_ANDROID
+#include <atomic>
+#endif
 /* UT99_ANDROID_V169L_CHECKBOX_TOUCH_ROOT_PATH */
 /* UT99_ANDROID_V81_CURSOR_MODE_SWITCH */
 /* UT99_ANDROID_V73_RESOLUTION_SCALE_RESTORED_START_TOGGLE */
@@ -4772,6 +4775,8 @@ UBOOL UNSDLViewport::CauseInputEvent( INT iKey, EInputAction Action, FLOAT Delta
 	unguard;
 }
 
+#include "AndroidAimAssist.inl"
+
 UBOOL UNSDLViewport::TickInput()
 {
 	guard(UNSDLViewport::TickInput);
@@ -5829,6 +5834,7 @@ case SDL_MOUSEMOTION:
 
 #ifdef PLATFORM_ANDROID
 	UT99AndroidPersistAutoAimV78( this );
+	AndroidApplyAimAssist(this, DeltaTime);
 #endif
 
 	InputUpdateTime = CurTime;
