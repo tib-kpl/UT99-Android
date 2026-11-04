@@ -18,9 +18,9 @@ or while dead/unarmed. Stick deflection above 65% overrides tracking.
 | Level | Capture cone | Response / second | Maximum speed |
 | --- | --- | --- | --- |
 | Off | — | — | 0°/s |
-| Light | 2.5° | 2.5 | 12°/s |
-| Medium | 4° | 4 | 24°/s |
-| Strong | 6° | 6 | 42°/s |
+| Light | 4° | 4 | 24°/s |
+| Medium | 7° | 7 | 48°/s |
+| Strong | 10° | 11 | 84°/s |
 
 The previous target gets 1.5° capture tolerance and a small selection bias to reduce
 switching. Corrections use the shortest rotation, exponentially approach the target,
@@ -51,3 +51,11 @@ for 120 frames at 60 Hz. Remaining yaw error: Off 300, Light 12, Medium 7, Stron
 The fixture restored the view/settings and was removed from release builds.
 
 The final routing/axis implementation was rechecked with the same fixture. Off/Light/Medium/Strong again left errors of 300/12/7/5 units. Disabling controller ownership or supplying 80% stick deflection both left the error at 300 units (no correction).
+
+## Strength tuning (2.3.21)
+
+All active levels use wider capture cones and faster tracking; Strong doubles the
+speed limit from 42 to 84 degrees/second. A moving-target regression verifies
+that Strong keeps up with a target crossing at 45 degrees/second instead of
+falling behind. Off, teammate/visibility filtering and the 65% stick override
+are unchanged. The integration measurements above describe the older tuning.

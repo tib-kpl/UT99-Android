@@ -155,3 +155,15 @@ avec les deux APK signés : `*-classic-menu-release.apk` et
 échoue si la clé manque ou si le moteur et les ressources des variantes
 diffèrent. Voir `tools/check_menu_variants.py`. Les autres branches peuvent
 produire des artefacts de test, mais ne publient pas de release.
+
+## Parcours tournoi et messages de tutoriel (2.3.21)
+
+Après le choix d'une carte, les briefings d'objectifs et d'équipe sélectionnent
+leur bouton Continuer ou Lancer le match par défaut. Les autres lignes restent
+accessibles avec la croix directionnelle ; aucune action n'est déclenchée sans A.
+La sélection utilise l'identité du bouton natif, indépendamment du nombre de
+joueurs ou d'objectifs du briefing.
+
+La racine UWindow est aussi rendue pour les sous-titres du tutoriel lorsque le
+menu est fermé. Son fond flouté/assombri est désormais limité à bUWindowActive,
+afin de conserver une image nette sous ces messages et les notifications vocales.

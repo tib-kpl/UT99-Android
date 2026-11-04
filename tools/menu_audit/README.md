@@ -24,3 +24,12 @@ avec marque UTF-8 initiale couvrent également la lecture de `[public]`.
 
 Vérifié sur appareil en ARM64 et ARMv7. Le journal doit contenir les trois
 contrôles PASS (métadonnées, affectation et réouverture), sans FAIL.
+
+## Régression du parcours de tournoi et du fond
+
+`MenuFlowAudit` est un commandlet Windows v400, sans lancement de partie et sans
+écriture de sauvegarde. Compiler ce package après `UT99ConsoleMenu`, puis lancer
+`UCC.exe UT99MenuAudit.MenuFlowAudit`. Il exerce les fonctions du menu compilé :
+sélection de l'action principale sur des équipes de 0 à 8 joueurs, maintien des
+options, objectifs d'Assaut et fond désactivé pour les sous-titres/notifications
+vocales avec UWindow fermé. Attendre `MENU_FLOW failures=0`.

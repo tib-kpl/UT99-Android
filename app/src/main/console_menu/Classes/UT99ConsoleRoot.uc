@@ -374,12 +374,19 @@ function Tick(float Delta)
 
 }
 
+function bool ShouldPaintBackdrop()
+{
+    return Console.bUWindowActive && !Console.bQuickKeyEnable;
+}
+
 function Paint(Canvas C, float X, float Y)
 {
     local int i;
     local Texture Background;
     local float CropHeight;
-    if(Console.bQuickKeyEnable)
+    // UTConsole also renders this root for bLeaveOnScreen tutorial messages
+    // and speech while UWindow is closed. Those HUD overlays need a clear world.
+    if(!ShouldPaintBackdrop())
         return;
     if(IsGameplayMenu() && (MatchScreen == None || !MatchScreen.bPreviewMap))
     {

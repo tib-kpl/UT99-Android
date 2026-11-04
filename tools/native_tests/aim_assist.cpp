@@ -27,6 +27,15 @@ int main() {
         check(error < 2, "all active levels converge");
         previous = step;
     }
+    // A strong setting must keep up with an opponent crossing the view at
+    // 45 degrees/second. The former 42 degrees/second cap fell behind forever.
+    float view = 0.f, target = 5.f * 65536.f / 360.f;
+    for (int frame = 0; frame < 180; ++frame) {
+        target += 45.f * (65536.f / 360.f) / 60.f;
+        view += AndroidAim::Step((int)(target - view), 3, 1.f/60.f, 0);
+    }
+    check(std::fabs(target - view) * 360.f / 65536.f < 6.f,
+          "strong follows a target crossing at 45 degrees per second");
     check(AndroidAim::Cone(1) < AndroidAim::Cone(2) && AndroidAim::Cone(2) < AndroidAim::Cone(3), "capture cones increase with strength");
     check(!AndroidAim::Opponent(true, 0, 0, false), "same team excluded");
     check(AndroidAim::Opponent(true, 0, 1, false), "opposing team included");

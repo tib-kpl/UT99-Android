@@ -62,6 +62,7 @@ function Created()
         DetailArea.SetParent(Self);
     }
     BuildList();
+    SelectPrimaryAction();
     for(UnlockRow = 0; UnlockRow < Min(32, Count-1); UnlockRow++) WasLocked[UnlockRow] = byte(IsLocked(UnlockRow));
     if(LevelScreen != None && LevelScreen.PendingPos > LevelScreen.ArrowPos)
     {
@@ -71,6 +72,24 @@ function Created()
     }
     NextActionTime = UIClock+0.20;
     FocusWindow();
+}
+
+// Briefings keep every roster/objective option, but A should advance by default.
+// Select by control identity so different team sizes do not change the action.
+function SelectPrimaryAction()
+{
+    local int i;
+    local UWindowWindow Primary;
+    if(Roster != None) Primary = Roster.NextButton;
+    else if(Objectives != None) Primary = Objectives.NextButton;
+    if(Primary == None) return;
+    for(i = 0; i < Count-1; i++)
+        if(Controls[i] == Primary)
+        {
+            Row = i;
+            FirstRow = 0;
+            return;
+        }
 }
 
 function Tick(float Delta)
