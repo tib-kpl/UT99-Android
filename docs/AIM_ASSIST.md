@@ -59,3 +59,22 @@ speed limit from 42 to 84 degrees/second. A moving-target regression verifies
 that Strong keeps up with a target crossing at 45 degrees/second instead of
 falling behind. Off, teammate/visibility filtering and the 65% stick override
 are unchanged. The integration measurements above describe the older tuning.
+
+## Smoothing update
+
+Camera correction now uses a filtered angular velocity (18/s response) with an
+acceleration limit of eight times the selected maximum speed per second. This
+ramps acquisition and target-direction changes instead of instantly applying the
+full correction. A smoothstep curve fades assistance between 20% and 65% stick
+deflection; at 65% it stops immediately. Fractional rotation is accumulated with
+symmetric rounding, preventing tiny corrections from being discarded every frame.
+
+Target loss, occlusion, menus, input-mode changes and settings changes clear all
+motion history immediately; there is no continued tracking behind an obstacle.
+The existing capture cones and intensity speed limits are preserved.
+
+`aim_smoothing.cpp` exercises the production header on the host in CI: acquisition,
+acceleration-limited reversal, convergence without overshoot, fractional motion,
+override, reset, and a 45°/s moving target at 30/60/120 Hz. Local measured errors
+with UT99 Strong parameters (11/s response, 84 degrees/s limit) were 3.390° / 3.731° / 3.907° after three seconds.
+Console visual/feel validation remains to be done; this pass used local tests.
