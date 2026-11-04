@@ -149,6 +149,7 @@ final class GameSettingsMenu extends Dialog {
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setSmoothScrollingEnabled(false);
+        scroll.setFocusableInTouchMode(true);
         rows = new LinearLayout(activity);
         rows.setOrientation(LinearLayout.VERTICAL);
         rows.setPadding(dp(1), 0, dp(1), dp(6));
@@ -176,6 +177,10 @@ final class GameSettingsMenu extends Dialog {
     }
 
     private void select(int index, boolean focusRows) {
+        // Removing a focused row otherwise makes Android focus the first rail
+        // button (Controls). Keep focus in the content until the new rows exist.
+        scroll.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        scroll.requestFocus();
         tab = index;
         activity.getPreferences(0).edit().putInt(tabPreference, index).apply();
         pageTitle.setText(names.get(tab));
@@ -184,13 +189,19 @@ final class GameSettingsMenu extends Dialog {
             tabs.get(i).setSelected(i == tab);
             glyphs.get(i).color(i == tab ? accent : muted);
         }
-        rows.removeAllViews();
-        pages.get(tab).run();
-        scroll.scrollTo(0, 0);
+        try {
+            rows.removeAllViews();
+            pages.get(tab).run();
+            scroll.scrollTo(0, 0);
+        } finally {
+            scroll.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        }
         if (focusRows) {
             ArrayList<View> focusables = rows.getFocusables(View.FOCUS_FORWARD);
-            if (!focusables.isEmpty()) focusables.get(0).post(() -> focusables.get(0).requestFocus());
-        }
+            // Stay in this UI event: delayed requests can steal focus from a
+            // newer page when L1/R1 is pressed quickly.
+            if (!focusables.isEmpty()) focusables.get(0).requestFocus();
+        } else tabs.get(tab).requestFocus();
     }
 
     private TextView label(String value, int size, int color) {
