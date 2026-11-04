@@ -33,3 +33,21 @@ disable/override, rotation wrap, strength ordering, convergence, long-frame limi
 deathmatch/teamplay and spectator exclusion. Compile with the NDK clang++ using
 `--target=aarch64-linux-android21 -static-libstdc++` and the include directory
 `third_party/ut99dc/Source/NSDLDrv/Src`, then run the binary through ADB.
+
+## SDL routing regression (2.3.20)
+
+Controller ownership and right-stick magnitude must be observed in
+`Activity.dispatchGenericMotionEvent`, before delegating to SDL. SDL's focused
+SurfaceView consumes joystick events, bypassing Activity.onGenericMotionEvent.
+The v47 axis mirrors are updated only in menus on that path, so they cannot be
+used to implement the firm-stick override during gameplay. JNI publishes the
+dispatched axes atomically along with input ownership.
+
+Validated on Odin2 Portal with input injected through the physical Xbox controller
+device node: ownership changes to controller on stick motion. In a standalone
+DM-Deck16][ bot match, a temporary game-thread integration fixture aimed 300
+rotation units away from a visible live bot, then called the production assistance
+for 120 frames at 60 Hz. Remaining yaw error: Off 300, Light 12, Medium 7, Strong 5.
+The fixture restored the view/settings and was removed from release builds.
+
+The final routing/axis implementation was rechecked with the same fixture. Off/Light/Medium/Strong again left errors of 300/12/7/5 units. Disabling controller ownership or supplying 80% stick deflection both left the error at 300 units (no correction).

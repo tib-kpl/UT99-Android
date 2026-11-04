@@ -6,6 +6,7 @@
 // Atomics preserve the initial preference and avoid UI/game-thread data races.
 static std::atomic<int> AndroidAimRequestedLevel(2);
 static std::atomic<int> AndroidAimRequestedController(0);
+static std::atomic<float> AndroidAimRequestedStickX(0.f), AndroidAimRequestedStickY(0.f);
 static INT AndroidAimLevel = -1;
 static APawn* AndroidAimPrevious = NULL; // only compared with entries from the live PawnList
 
@@ -13,8 +14,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_ast_ut99_GameActivity_nativeAimAssist
 {
     AndroidAimRequestedLevel.store(Clamp<INT>(Level, 0, 3));
 }
-extern "C" JNIEXPORT void JNICALL Java_com_ast_ut99_GameActivity_nativeAimAssistInput(JNIEnv*, jclass, jboolean Controller)
+extern "C" JNIEXPORT void JNICALL Java_com_ast_ut99_GameActivity_nativeAimAssistInput(JNIEnv*, jclass, jboolean Controller, jfloat RightX, jfloat RightY)
 {
+    AndroidAimRequestedStickX.store(Clamp<FLOAT>(RightX, -1.f, 1.f));
+    AndroidAimRequestedStickY.store(Clamp<FLOAT>(RightY, -1.f, 1.f));
     AndroidAimRequestedController.store(Controller ? 1 : 0);
 }
 
@@ -27,8 +30,15 @@ static void AndroidApplyAimAssist(UNSDLViewport* Viewport, FLOAT DeltaTime)
         UT99_ANDROID_SDL_LOGI("Android aim assist level=%d", AndroidAimLevel);
     }
     UBOOL AndroidAimController = AndroidAimRequestedController.load() != 0;
+    static INT LastController = -1;
+    if (LastController != AndroidAimController) {
+        LastController = AndroidAimController;
+        UT99_ANDROID_SDL_LOGI("Android aim controller=%d", LastController);
+    }
     APlayerPawn* Player = Viewport->Actor;
-    FLOAT Stick = Max(Abs(GUT99V47RX), Abs(GUT99V47RY));
+    // These axes come from dispatch, before SDL consumes the motion event.
+    // The legacy v47 mirrors are only updated in menus on the SDL input path.
+    FLOAT Stick = Max(Abs(AndroidAimRequestedStickX.load()), Abs(AndroidAimRequestedStickY.load()));
     if (!AndroidAimLevel || !AndroidAimController || Stick > .65f || !Player
         || Player->Health <= 0 || !Player->Weapon || Player->bBehindView || Player->ViewTarget
         || Player->bShowMenu || Viewport->bShowWindowsMouse || !Player->PlayerReplicationInfo

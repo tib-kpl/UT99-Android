@@ -1083,7 +1083,7 @@ public class GameActivity extends SDLActivity {
     // UT99_ANDROID_NATIVE_INPUT_V47
     private static native void nativeAndroidButtonV47(int keyCode, boolean down);
     private static native void nativeAimAssistSettings(int level);
-    private static native void nativeAimAssistInput(boolean controller);
+    private static native void nativeAimAssistInput(boolean controller, float rightX, float rightY);
     private static native void nativeAndroidAxisV47(int axis, float value);
     private static native void nativeAndroidTouchLookV101(float x, float y);
     private static native int nativeAndroidInputResetSerialRT();
@@ -1672,6 +1672,7 @@ public class GameActivity extends SDLActivity {
         boolean textDeleteKey = !physicalKeyboard
                 && (keyCode == android.view.KeyEvent.KEYCODE_DEL
                 || keyCode == android.view.KeyEvent.KEYCODE_FORWARD_DEL);
+        if (physicalKeyboard) nativeAimAssistInput(false, 0, 0);
         if (ut99RetroTouchBridge != null && physicalKeyboard) {
             ut99RetroTouchBridge.onHardwareDesktopInput();
         }
@@ -1712,7 +1713,13 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public boolean dispatchGenericMotionEvent(android.view.MotionEvent event) {
-        if (isPhysicalMouseEventV210(event)) nativeAimAssistInput(false);
+        // Observe input before SDL's focused SurfaceView can consume it. Activity's
+        // onGenericMotionEvent is only a fallback and is skipped on SDL's normal path.
+        if (isAndroidGamepadSourceV47(event)) {
+            nativeAimAssistInput(ut99IsRealControllerEventV231(event),
+                    firstActiveAxisV108(event, android.view.MotionEvent.AXIS_Z, android.view.MotionEvent.AXIS_RX),
+                    firstActiveAxisV108(event, android.view.MotionEvent.AXIS_RZ, android.view.MotionEvent.AXIS_RY));
+        } else if (isPhysicalMouseEventV210(event)) nativeAimAssistInput(false, 0, 0);
         // UT99_ANDROID_CHROMEOS_MOUSE_ACTIVITY_ROUTE_V210:
         // ChromeOS may deliver mouse hover, capture and button events to the
         // Activity/DecorView instead of the SDL Surface's generic-motion
@@ -1799,7 +1806,6 @@ public class GameActivity extends SDLActivity {
             if (ut99RetroTouchBridge != null && ut99IsRealControllerEventV231(event)) {
                 ut99RetroTouchBridge.onHardwareControllerInput();
             }
-            nativeAimAssistInput(ut99IsRealControllerEventV231(event));
             final boolean ouya = isOuyaDeviceV108();
             float lx = event.getAxisValue(android.view.MotionEvent.AXIS_X);
             float ly = event.getAxisValue(android.view.MotionEvent.AXIS_Y);
@@ -2039,7 +2045,7 @@ public class GameActivity extends SDLActivity {
         }
 
         nativeAimAssistSettings(AndroidGameSettings.aimAssist(this));
-        nativeAimAssistInput(false);
+        nativeAimAssistInput(false, 0, 0);
         ut99V52ScheduleImmersive(); // v52 onResume
         ut99V76HideImeUnlessRequested();
     }
@@ -2298,7 +2304,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        nativeAimAssistInput(false);
+        nativeAimAssistInput(false, 0, 0);
         // RetroTouch must see the current native menu state before a fresh pointer
         // is dispatched, otherwise the first UWindow tap after opening a menu can
         // be consumed by a stale GAMEPLAY mode.
