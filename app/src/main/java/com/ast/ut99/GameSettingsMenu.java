@@ -13,13 +13,14 @@ import java.util.ArrayList;
 import java.util.Locale;
 import org.libsdl.app.SDLActivity;
 
-/** Instant, controller-first settings over the paused game. All graphics are code-drawn. API 16+. */
+/** Instant, controller-first settings over the paused game. Original game logos, code-drawn controls. API 16+. */
 final class GameSettingsMenu extends Dialog {
     interface Result { void complete(int action); }
     interface Choice { void changed(int index); }
     interface Level { void changed(int progress); }
     private final Activity activity;
     private final boolean tournament, french;
+    private final int logoResource;
     private final int accent, ink = 0xffeeeae1, muted = 0xffa5a8aa;
     private final ArrayList<String> names = new ArrayList<>();
     private final ArrayList<Runnable> pages = new ArrayList<>();
@@ -34,10 +35,11 @@ final class GameSettingsMenu extends Dialog {
     private int axisDirection;
     private String tabPreference;
 
-    GameSettingsMenu(Activity activity, boolean tournament) {
+    GameSettingsMenu(Activity activity, boolean tournament, int logoResource) {
         super(activity, android.R.style.Theme_Translucent_NoTitleBar_Fullscreen);
         this.activity = activity;
         this.tournament = tournament;
+        this.logoResource = logoResource;
         french = "fr".equalsIgnoreCase(activity.getResources().getConfiguration().locale.getLanguage());
         accent = tournament ? 0xffef7768 : 0xffd9b779;
         setCanceledOnTouchOutside(false);
@@ -79,26 +81,12 @@ final class GameSettingsMenu extends Dialog {
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setPadding(dp(16), dp(20), dp(16), dp(14));
         panel.addView(rail, new LinearLayout.LayoutParams(dp(railWidth), -1));
-        LinearLayout brand = new LinearLayout(activity);
-        brand.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView emblem = new ImageView(activity);
-        emblem.setImageDrawable(new MenuGlyph(-1, accent));
-        brand.addView(emblem, new LinearLayout.LayoutParams(dp(34), dp(38)));
-        LinearLayout wordmark = new LinearLayout(activity);
-        wordmark.setOrientation(LinearLayout.VERTICAL);
-        wordmark.setPadding(dp(10), 0, 0, 0);
-        TextView unreal = label("UNREAL", width < 560 ? 15 : 19, ink);
-        unreal.setTypeface(face(true));
-        wordmark.addView(unreal);
-        String edition = tournament ? "TOURNAMENT" : title.contains("GOLD") ? "GOLD" : "CLASSIC";
-        TextView editionLabel = label(edition, width < 560 ? 10 : 11, accent);
-        editionLabel.setSingleLine(true);
-        editionLabel.setEllipsize(TextUtils.TruncateAt.END);
-        editionLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        if (Build.VERSION.SDK_INT >= 21) editionLabel.setLetterSpacing(.12f);
-        wordmark.addView(editionLabel);
-        brand.addView(wordmark, new LinearLayout.LayoutParams(0, -2, 1));
-        rail.addView(brand);
+        ImageView logo = new ImageView(activity);
+        logo.setImageResource(logoResource);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setAdjustViewBounds(true);
+        logo.setContentDescription(title);
+        rail.addView(logo, new LinearLayout.LayoutParams(-1, dp(52)));
         TextView overline = label(text("PARAMÈTRES", "SETTINGS"), 11, muted);
         overline.setPadding(dp(10), dp(20), 0, dp(10));
         rail.addView(overline);
@@ -577,13 +565,7 @@ final class GameSettingsMenu extends Dialog {
             canvas.save(); canvas.translate(bounds.left, bounds.top); canvas.scale(bounds.width() / 24f, bounds.height() / 24f);
             paint.setColor(color); paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(1.5f);
             paint.setStrokeJoin(Paint.Join.ROUND); paint.setStrokeCap(Paint.Cap.ROUND);
-            if (kind == -1) {
-                Path rim = new Path(); rim.moveTo(5, 1); rim.lineTo(19, 1); rim.lineTo(23, 5); rim.lineTo(23, 19);
-                rim.lineTo(19, 23); rim.lineTo(5, 23); rim.lineTo(1, 19); rim.lineTo(1, 5); rim.close();
-                canvas.drawPath(rim, paint); paint.setStyle(Paint.Style.FILL);
-                paint.setTypeface(Typeface.create("serif", Typeface.BOLD_ITALIC)); paint.setTextSize(20);
-                canvas.drawText("U", 4, 19, paint);
-            } else if (kind == 0) {
+            if (kind == 0) {
                 Path pad = new Path(); pad.moveTo(9, 3); pad.lineTo(15, 3); pad.lineTo(15, 9); pad.lineTo(21, 9);
                 pad.lineTo(21, 15); pad.lineTo(15, 15); pad.lineTo(15, 21); pad.lineTo(9, 21); pad.lineTo(9, 15);
                 pad.lineTo(3, 15); pad.lineTo(3, 9); pad.lineTo(9, 9); pad.close(); canvas.drawPath(pad, paint);

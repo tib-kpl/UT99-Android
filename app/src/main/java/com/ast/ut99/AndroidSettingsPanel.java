@@ -27,7 +27,7 @@ final class AndroidSettingsPanel extends ContextWrapper {
         this.root = root;
         french = "fr".equalsIgnoreCase(getResources().getConfiguration().locale.getLanguage());
         selectedLanguage = AndroidGameSettings.language(this);
-        menu = new GameSettingsMenu(activity, true);
+        menu = new GameSettingsMenu(activity, true, R.drawable.menu_logo_ut99);
         menu.setOnDismissListener(dialog -> { if (!activity.isFinishing()) completed.complete(result); });
         menu.page(text("Commandes", "Controls"), this::controls);
         menu.page(text("Jeu", "Game"), this::game);
