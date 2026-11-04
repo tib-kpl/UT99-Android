@@ -47,6 +47,9 @@ jobs:
           java -cp build/java-policy com.ast.ut99.RedirectDownloadAudit --self-test
           java -cp build/java-policy com.ast.ut99.DiscImageAudit --self-test
 
+      - name: Check Android settings shortcut
+        run: python3 tools/test_settings_chord.py
+
       - name: Build both menus
         run: |
           chmod +x gradlew

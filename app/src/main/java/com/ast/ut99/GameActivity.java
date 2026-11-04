@@ -132,6 +132,9 @@ public class GameActivity extends SDLActivity {
     private boolean legacySafeMode;
     private Ut99RetroTouchBridge ut99RetroTouchBridge;
     private View androidSettingsGear;
+    private GameSettingsMenu settingsMenu;
+    private final GameMenuShortcut settingsShortcut = new GameMenuShortcut(
+            this::openAndroidSettings, this::dispatchKeyEvent);
 
     // UT99_ANDROID_PERF_A_FEATURE_CACHE:
     // hasSystemFeature() is a binder call on Android 4.x. These checks run from
@@ -278,6 +281,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        if (settingsMenu != null) { settingsMenu.setOnDismissListener(null); settingsMenu.dismiss(); }
         Ut99RedirectDownload.cancel();
         final boolean finishing = isFinishing();
         try {
@@ -437,6 +441,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
+        if (!hasFocus) settingsShortcut.reset();
         if (hasFocus && (!ut99V56SurfaceFixedOnce || !ut99V59FullscreenLayoutOnce)) ut99V55ScheduleFixedSurface(); // v59 focus-until-ready
         if (hasFocus) ut99V52ScheduleImmersive(); // v52 focus
         if (hasFocus) ut99V50Immersive(); // v50 focus
@@ -1400,30 +1405,61 @@ public class GameActivity extends SDLActivity {
         // after launch and resume, so the first pad presses did nothing.
         gear.setFocusable(false);
         gear.setFocusableInTouchMode(false);
-        gear.setOnClickListener(v -> {
-            android.content.Intent intent = new android.content.Intent(this, SettingsActivity.class);
-            intent.putExtra(UT99Paths.EXTRA_DATA_ROOT, dataRoot.getAbsolutePath());
-            startActivityForResult(intent, SettingsActivity.OPEN);
-        });
+        gear.setOnClickListener(v -> openAndroidSettings());
         gear.setAlpha(.45f);
         int size = (int)(40 * density + .5f);
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(size, size,
                 android.view.Gravity.TOP | android.view.Gravity.RIGHT);
         androidSettingsGear = gear;
-        addContentView(gear, params); gear.bringToFront();
+        addContentView(gear, params);
+        final Runnable refreshSettingsIcon = new Runnable() {
+            @Override public void run() {
+                if (gear.hasWindowFocus()) updateAndroidSettingsIcon();
+                gear.postDelayed(this, 750);
+            }
+        };
+        gear.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View view) {
+                view.removeCallbacks(refreshSettingsIcon);
+                view.post(refreshSettingsIcon);
+            }
+            @Override public void onViewDetachedFromWindow(View view) { view.removeCallbacks(refreshSettingsIcon); }
+        });
+        gear.post(refreshSettingsIcon);
+        raiseAndroidSettingsButton();
+    }
+
+    private void openAndroidSettings() {
+        if (dataRoot == null || isFinishing()) return;
+        if (settingsMenu != null && settingsMenu.isShowing()) return;
+        if (ut99RetroTouchBridge != null) ut99RetroTouchBridge.pause();
+        settingsMenu = AndroidSettingsPanel.open(this, dataRoot, result -> {
+            settingsMenu = null;
+            if (ut99RetroTouchBridge != null) ut99RetroTouchBridge.start();
+            ut99V52ScheduleImmersive();
+            onSettingsResult(result);
+        });
     }
 
     void raiseAndroidSettingsButton() {
-        if (androidSettingsGear != null) androidSettingsGear.bringToFront();
+        if (androidSettingsGear == null) return;
+        updateAndroidSettingsIcon();
+        androidSettingsGear.bringToFront();
     }
 
-    @Override protected void onActivityResult(int request, int result, android.content.Intent data) {
-        super.onActivityResult(request, result, data);
-        if (request == SettingsActivity.OPEN && result == SettingsActivity.RESET_TOUCH && ut99RetroTouchBridge != null) {
+    private void updateAndroidSettingsIcon() {
+        if (androidSettingsGear == null) return;
+        boolean touchOnly = getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
+                && !ut99RetroTouchHasController() && !ut99RetroTouchHasDesktopInput();
+        androidSettingsGear.setVisibility(touchOnly ? View.VISIBLE : View.GONE);
+    }
+
+    private void onSettingsResult(int result) {
+        if (result == AndroidSettingsPanel.RESET_TOUCH && ut99RetroTouchBridge != null) {
             ut99RetroTouchBridge.resetLayout();
         }
-        if (request == SettingsActivity.OPEN && result == SettingsActivity.EDIT_TOUCH && ut99RetroTouchBridge != null) {
-            // Wait for the bridge to restore its mode after the Activity resumes.
+        if (result == AndroidSettingsPanel.EDIT_TOUCH && ut99RetroTouchBridge != null) {
+            // Wait for the bridge to restore its mode after the overlay closes.
             androidSettingsGear.postDelayed(() -> {
                 if (!ut99RetroTouchBridge.startLayoutEditing()) {
                     android.widget.Toast.makeText(this, getString(com.ast.ut99.R.string.touch_layout_hidden),
@@ -1431,10 +1467,10 @@ public class GameActivity extends SDLActivity {
                 }
             }, 600);
         }
-        if (request == SettingsActivity.OPEN && (result == SettingsActivity.RESTART || result == SettingsActivity.DATA)) {
+        if ((result == AndroidSettingsPanel.RESTART || result == AndroidSettingsPanel.DATA)) {
             android.content.Intent launcher = new android.content.Intent(this, MainActivity.class);
             launcher.putExtra("wait_for_game_pid", android.os.Process.myPid());
-            launcher.putExtra("manage_game_data", result == SettingsActivity.DATA);
+            launcher.putExtra("manage_game_data", result == AndroidSettingsPanel.DATA);
             startActivity(launcher);
             finish();
         }
@@ -1626,6 +1662,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (settingsShortcut.key(event)) return true;
         final int action = event.getAction();
         final int keyCode = event.getKeyCode();
         final boolean physicalKeyboard = isPhysicalKeyboardEventV210(event);
@@ -1938,6 +1975,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onPause() {
+        settingsShortcut.reset();
         try {
             if (ut99RetroTouchBridge != null) {
                 ut99RetroTouchBridge.pause();

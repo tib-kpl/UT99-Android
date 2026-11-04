@@ -76,7 +76,14 @@ replaces the other and keeps your data and settings.
 - Install to internal storage, a microSD card or **any folder**. A folder that
   already holds a valid game can be used in place, without copying.
 
-**In-game Android settings** (gear icon, top right)
+**In-game Android settings** — **Select + Start** (either order) opens the
+blue gunmetal/red Tournament-themed menu, shared by both menu variants.
+**L1/R1** switch tabs, the D-pad/stick navigates, **A** confirms and **B** goes back.
+Settings open as a modal panel over the paused game, without page transitions.
+Each option shows its default; a confirmed reset preserves touch layouts and game data.
+**F10** opens it with a keyboard. The existing small gear at the top right is
+visible only with touch input, without a physical controller, keyboard or mouse.
+
 - Touch controller: "Automatic (without a physical controller)", "Always show"
   or "Hide"; opacity from 20 to 100 %; edit and reset the layout.
 - Game language (restarts automatically).

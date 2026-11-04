@@ -53,13 +53,7 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
-        <activity android:name="com.ast.ut99.SettingsActivity"
-            android:exported="false" android:process=":game"
-            android:hardwareAccelerated="true" android:screenOrientation="landscape"
-            android:enableOnBackInvokedCallback="false"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
-
-        <activity
+<activity
             android:name="com.ast.ut99.GameActivity"
             android:configChanges="keyboard|keyboardHidden|layoutDirection|locale|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
             android:exported="false"

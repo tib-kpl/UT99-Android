@@ -4,6 +4,19 @@ Each release ships two signed APKs: **console-menu** (console/phone menu) and
 **classic-menu** (original UT99 menu). Engine fixes apply to both. Releases are
 published on [the releases page](https://github.com/tib-kpl/UT99-Android/releases).
 
+## 2.3.16
+
+- Replace the Android settings list with a blue gunmetal/red Tournament-themed
+  tabbed menu, shared by the classic and console/phone menu APKs.
+- Show settings as a modal window over the game, with no Activity switch or
+  opening/closing animation. The game surface remains visible around the panel.
+- Show each option's default value and provide a confirmed reset of Android
+  settings, preserving custom touch layouts, game data and saved games.
+- Open with Select + Start in either order, or F10 with a keyboard. The existing
+  small gear appears only for touch input. D-pad/stick, A/B and L1/R1 navigate.
+- Preserve language, game location and touch layout settings, with controller
+  confirmations and regression tests for shortcut ordering and input release.
+
 ## 2.3.15
 
 - Integrated upstream 2.3.0 performance and stability updates: controller input,
