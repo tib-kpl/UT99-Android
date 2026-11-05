@@ -218,6 +218,8 @@ function string GetLocation()
 function BeforePaint(Canvas C, float X, float Y)
 {
     local int i;
+    local float TitleW, TitleH, DetailTop;
+    local Font SavedFont;
     if(LevelScreen != None && LevelScreen.LadderObj != None) LevelScreen.BeforePaint(C, X, Y);
     for(i = 0; i < Min(32, Count-1); i++)
     {
@@ -263,8 +265,21 @@ function BeforePaint(Canvas C, float X, float Y)
     if(DetailArea != None)
     {
         DetailArea.WinLeft = WinWidth*0.54;
-        DetailArea.WinTop = WinHeight*0.71;
-        DetailArea.SetSize(WinWidth*0.40, WinHeight*0.16);
+        DetailTop = WinHeight*0.71;
+        if(LevelScreen != None)
+        {
+            // Start below the title's actual height, with a separate margin.
+            // A fixed 3% offset could overlap the title at smaller UI sizes.
+            SavedFont = C.Font;
+            C.Font = MenuFont;
+            TextSize(C, Left(PickerMapName, Max(0, Len(PickerMapName)-4)), TitleW, TitleH);
+            C.Font = SavedFont;
+            DetailTop = WinHeight*PreviewLabelY+TitleH+FMax(8, WinHeight*0.02);
+        }
+        DetailArea.WinTop = DetailTop;
+        if(LevelScreen != None)
+            DetailArea.SetSize(WinWidth*0.40, FMax(0, WinHeight*0.90-DetailTop));
+        else DetailArea.SetSize(WinWidth*0.40, WinHeight*0.16);
         DetailArea.MyFont = Root.Fonts[F_Normal];
         DetailArea.bAutoScrolling = True;
     }
