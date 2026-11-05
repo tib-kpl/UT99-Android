@@ -2021,6 +2021,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onResume() {
+        controllerMapping.start();
         if (isAutomotiveDevice()) {
             // Let SDL restore the native thread/audio/GL state first on AAOS.
             super.onResume();
