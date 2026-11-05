@@ -354,6 +354,11 @@ UBOOL UNOpenGLESRenderDevice::Init( UViewport* InViewport, INT NewX, INT NewY, I
 	}
 
 	debugf( NAME_Log, "Got OpenGL %s", glGetString( GL_VERSION ) );
+#ifdef PLATFORM_ANDROID
+	GLint ActualDepth = 0;
+	glGetIntegerv( GL_DEPTH_BITS, &ActualDepth );
+	UT99_ANDROID_GLES_LOGI( "Android depth buffer=%d renderer=%s", ActualDepth, glGetString(GL_RENDERER) );
+#endif
 
 	SupportsFogMaps = true;
 	SupportsDistanceFog = true;

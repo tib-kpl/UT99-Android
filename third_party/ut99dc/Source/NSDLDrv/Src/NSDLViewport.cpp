@@ -4096,7 +4096,8 @@ void UNSDLViewport::OpenWindow( DWORD InParentWindow, UBOOL Temporary, INT NewX,
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 2 );
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 0 );
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
-			SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 16 );
+			// Distant BSP faces need more precision than the GLES 16-bit default.
+			SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 24 );
 #else
 			if( GLProfile == SDL_GL_CONTEXT_PROFILE_ES )
 			{
@@ -4125,6 +4126,15 @@ void UNSDLViewport::OpenWindow( DWORD InParentWindow, UBOOL Temporary, INT NewX,
 		{
 			// Creating new viewport.
 			hWnd = SDL_CreateWindow( "", OpenX, OpenY, NewX, NewY, Flags );
+#if PLATFORM_ANDROID
+			if( !hWnd && DoOpenGL )
+			{
+				// Retain support for old EGL drivers with only 16-bit depth.
+				debugf( NAME_Warning, "GLES window failed; retrying with 16-bit depth: %s", SDL_GetError() );
+				SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 16 );
+				hWnd = SDL_CreateWindow( "", OpenX, OpenY, NewX, NewY, Flags );
+			}
+#endif
 			if( !hWnd && DoOpenGL )
 			{
 				// Try without GL.
