@@ -27,7 +27,17 @@ final class GameMenuShortcut {
                 finally { replaying = false; }
             }
         });
-        flush = chord::flush;
+        flush = this::flushPending;
+    }
+
+    private void flushPending() {
+        // A disconnected pad cannot send Select/Start's final KEY_UP.
+        for (KeyEvent event : original) if (event != null && event.getDevice() == null) {
+            reset();
+            return;
+        }
+        chord.flush();
+        if (original[0] != null || original[1] != null) handler.postDelayed(flush, 250);
     }
 
     boolean key(KeyEvent event) {

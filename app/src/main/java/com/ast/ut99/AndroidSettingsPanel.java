@@ -30,6 +30,7 @@ final class AndroidSettingsPanel extends ContextWrapper {
         menu = new GameSettingsMenu(activity, true, R.drawable.menu_logo_ut99);
         menu.setOnDismissListener(dialog -> { if (!activity.isFinishing()) completed.complete(result); });
         menu.page(text("Commandes", "Controls"), this::controls);
+        menu.page(text("Manette", "Controller"), () -> ControllerMapping.page(this, menu, true, french));
         menu.page(text("Confort", "Comfort"), this::comfort);
         menu.page(text("Jeu", "Game"), this::game);
         menu.page(text("Fichiers", "Game data"), this::data);

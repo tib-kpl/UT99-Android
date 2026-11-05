@@ -1545,6 +1545,9 @@ static UBOOL GUT99V47BtnR1 = 0;
 static UBOOL GUT99V47BtnThumbL = 0; // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120
 static UBOOL GUT99V47BtnThumbR = 0; // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120
 static UBOOL GUT99V47BtnStart = 0;
+static UBOOL GUT99ControllerScoreButton=0;
+#include "AndroidScoreboard.h"
+static AndroidScoreboardState GUT99ControllerScores;
 static UBOOL GUT99V47BtnSelect = 0;
 static UBOOL GUT99V47BtnDup = 0;
 static UBOOL GUT99V47BtnDdown = 0;
@@ -1801,6 +1804,8 @@ static void UT99V47ReleaseGameplayStatesV79( UNSDLViewport* Viewport )
     UT99V117PressMapped( Viewport, IK_Joy9,      GUT99V120RJoyPress, GUT99V120RJoyPressKey, 0, "RJoyPress" ); // UT99_ANDROID_CONTROLLER_FULL_REMAP_V120
     UT99V117PressMapped( Viewport, IK_Joy13,     GUT99V47Fire,  GUT99V117FireKey,  0, "Joy13" );
     UT99V117PressMapped( Viewport, IK_Joy12,     GUT99V47AltFire, GUT99V117AltFireKey, 0, "Joy12" );
+    GUT99ControllerScores.Update(Viewport->Actor,false);
+    GUT99ControllerScoreButton=GUT99V47BtnSelect=0;
     GUT99V47BtnA = GUT99V47BtnB = GUT99V47BtnX = GUT99V47BtnY = 0;
     GUT99V47BtnL1 = GUT99V47BtnR1 = GUT99V47BtnThumbL = GUT99V47BtnThumbR = 0;
     GUT99V47LT = GUT99V47RT = 0.0f;
@@ -1857,6 +1862,8 @@ static INT UT99RetroTouchDetermineUiState( UNSDLViewport* Viewport, UBOOL bMenu 
 
 static void UT99V47TickInput( UNSDLViewport* Viewport, UBOOL bMenu )
 {
+    const UBOOL Scores=!bMenu && (GUT99V47BtnSelect || GUT99ControllerScoreButton);
+    if( Viewport ) GUT99ControllerScores.Update(Viewport->Actor,Scores!=0);
     GUT99AndroidMenuVisibleV91 = bMenu ? 1 : 0;
     GUT99RetroTouchUiState = UT99RetroTouchDetermineUiState( Viewport, bMenu );
     static UBOOL V72LoggedActive = 0;
@@ -2065,6 +2072,7 @@ static void UT99V47SetAndroidButton( INT KeyCode, UBOOL Down )
         case 82: GUT99V47BtnStart = Down; break; // KEYCODE_MENU / OUYA center button
         case 108: GUT99V47BtnStart = Down; break;// KEYCODE_BUTTON_START
         case 110: GUT99V47BtnStart = Down; break;// KEYCODE_BUTTON_MODE
+        case 98: GUT99ControllerScoreButton = Down; break; // APK scoreboard mapping
         case 109: GUT99V47BtnSelect = Down; break;// KEYCODE_BUTTON_SELECT
         case 19: GUT99V47BtnDup = Down; break;   // DPAD_UP
         case 20: GUT99V47BtnDdown = Down; break; // DPAD_DOWN
@@ -4642,6 +4650,8 @@ void UNSDLViewport::UpdateInput( UBOOL Reset )
         // network player replacement and other engine-side input resets. Expose a
         // monotonically increasing serial to Java so RetroTouch drops its pointer
         // ownership/latches at the exact same boundary.
+        GUT99ControllerScores.Update(Actor,false);
+        GUT99ControllerScoreButton=GUT99V47BtnSelect=0;
         ++GUT99RetroTouchInputResetSerial;
 #endif
 	}
@@ -5073,6 +5083,8 @@ while( SDL_PollEvent( &Ev ) )
             case SDL_CONTROLLERDEVICEREMOVED:
             {
                 // For REMOVED, cdevice.which is the SDL joystick instance id.
+                GUT99ControllerScores.Update(Actor,false);
+                GUT99ControllerScoreButton=GUT99V47BtnSelect=0;
                 UT99AndroidCloseControllerInstance( (SDL_JoystickID)Ev.cdevice.which, "SDL_CONTROLLERDEVICEREMOVED" );
                 // A Retroid mode switch can replace one Android device with
                 // another almost immediately. Scan again after closing so a

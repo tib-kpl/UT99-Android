@@ -133,6 +133,7 @@ public class GameActivity extends SDLActivity {
     private Ut99RetroTouchBridge ut99RetroTouchBridge;
     private View androidSettingsGear;
     private GameSettingsMenu settingsMenu;
+    private final ControllerMapping controllerMapping = new ControllerMapping(this, this::dispatchKeyEvent);
     private final GameMenuShortcut settingsShortcut = new GameMenuShortcut(
             this::openAndroidSettings, this::dispatchKeyEvent);
 
@@ -441,7 +442,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
-        if (!hasFocus) settingsShortcut.reset();
+        if (!hasFocus) { controllerMapping.reset(); settingsShortcut.reset(); }
         if (hasFocus && (!ut99V56SurfaceFixedOnce || !ut99V59FullscreenLayoutOnce)) ut99V55ScheduleFixedSurface(); // v59 focus-until-ready
         if (hasFocus) ut99V52ScheduleImmersive(); // v52 focus
         if (hasFocus) ut99V50Immersive(); // v50 focus
@@ -1666,6 +1667,7 @@ public class GameActivity extends SDLActivity {
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
         if (settingsShortcut.key(event)) return true;
+        if (controllerMapping.key(event)) return true;
         final int action = event.getAction();
         final int keyCode = event.getKeyCode();
         final boolean physicalKeyboard = isPhysicalKeyboardEventV210(event);
@@ -1986,6 +1988,7 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onPause() {
+        controllerMapping.stop();
         settingsShortcut.reset();
         try {
             if (ut99RetroTouchBridge != null) {

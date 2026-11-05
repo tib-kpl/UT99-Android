@@ -91,6 +91,15 @@ final class GameSettingsMenu extends Dialog {
         overline.setPadding(dp(10), dp(20), 0, dp(10));
         rail.addView(overline);
 
+        ScrollView tabScroll = new ScrollView(activity);
+        tabScroll.setVerticalScrollBarEnabled(false);
+        tabScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        tabScroll.setSmoothScrollingEnabled(false);
+        LinearLayout tabList = new LinearLayout(activity);
+        tabList.setOrientation(LinearLayout.VERTICAL);
+        tabScroll.addView(tabList);
+        rail.addView(tabScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
         for (int i = 0; i < names.size(); i++) {
             final int index = i;
             Button button = action(names.get(i), () -> select(index, true));
@@ -103,12 +112,11 @@ final class GameSettingsMenu extends Dialog {
             if (width >= 560) button.setCompoundDrawables(glyph, null, null, null);
             button.setCompoundDrawablePadding(dp(10));
             glyphs.add(glyph);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(48));
-            lp.bottomMargin = dp(5);
-            rail.addView(button, lp);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(names.size() > 4 ? 42 : 48));
+            lp.bottomMargin = dp(4);
+            tabList.addView(button, lp);
             tabs.add(button);
         }
-        rail.addView(new View(activity), new LinearLayout.LayoutParams(1, 0, 1));
         Button resume = action(text("Reprendre", "Resume"), this::dismiss);
         resume.setBackground(primaryBackground());
         resume.setTextColor(tournament ? 0xff291817 : 0xff292218);
@@ -189,6 +197,8 @@ final class GameSettingsMenu extends Dialog {
             tabs.get(i).setSelected(i == tab);
             glyphs.get(i).color(i == tab ? accent : muted);
         }
+        Button activeTab = tabs.get(tab);
+        activeTab.requestRectangleOnScreen(new Rect(0, 0, activeTab.getWidth(), activeTab.getHeight()), true);
         try {
             rows.removeAllViews();
             pages.get(tab).run();
@@ -558,7 +568,7 @@ final class GameSettingsMenu extends Dialog {
 
     private int kind(String name) {
         String value = name.toLowerCase(Locale.ROOT);
-        if (value.contains("command") || value.contains("control")) return 0;
+        if (value.contains("command") || value.contains("control") || value.contains("manette")) return 0;
         if (value.contains("confort") || value.contains("comfort")) return 1;
         if (value.contains("affich") || value.contains("display")) return 2;
         if (value.contains("fichier") || value.contains("data")) return 4;
