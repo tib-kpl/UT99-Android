@@ -2,6 +2,15 @@
 #include <math.h>
 
 namespace AndroidAimMotion {
+struct Profile { float cone, response, speed; };
+inline const Profile& ProfileFor(int level, bool tournament) {
+    static const Profile profiles[2][4] = {
+        {{0,0,0}, {2.5f,2.5f,12.f}, {4.f,4.f,24.f}, {6.f,6.f,42.f}},
+        {{0,0,0}, {4.f,4.f,24.f}, {7.f,7.f,48.f}, {10.f,11.f,84.f}}
+    };
+    if (level < 0 || level > 3) level = 0;
+    return profiles[tournament ? 1 : 0][level];
+}
 inline float Weight(float stick) {
     if (stick <= .2f) return 1.f;
     if (stick >= .65f) return 0.f;
@@ -22,9 +31,10 @@ struct Axis {
         float desired = error * (1.f - expf(-response * dt)) / dt;
         if (desired > limit) desired = limit;
         if (desired < -limit) desired = -limit;
-        // Filter angular velocity, and bound acceleration on acquisition and
-        // target changes. Time-based coefficients keep 30/60/120 Hz consistent.
-        float change = (desired - velocity) * (1.f - expf(-18.f * dt));
+        // Exponential position response plus bounded acceleration. A second
+        // velocity low-pass added phase lag and could make higher levels worse
+        // on reversals; the acceleration bound already smooths those changes.
+        float change = desired - velocity;
         float acceleration = limit * 8.f * dt;
         if (change > acceleration) change = acceleration;
         if (change < -acceleration) change = -acceleration;

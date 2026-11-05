@@ -33,7 +33,8 @@ static void AndroidApplyAimAssist(UNSDLViewport* Viewport, FLOAT DeltaTime)
     if (AndroidAimLevel != Requested) {
         AndroidAimLevel = Requested;
         AndroidResetAim();
-        UT99_ANDROID_SDL_LOGI("Android aim assist level=%d", AndroidAimLevel);
+        const AndroidAimMotion::Profile& P = AndroidAimMotion::ProfileFor(AndroidAimLevel, true);
+        UT99_ANDROID_SDL_LOGI("Android aim assist level=%d cone=%.1f response=%.1f speed=%.1f", AndroidAimLevel, P.cone, P.response, P.speed);
     }
     UBOOL AndroidAimController = AndroidAimRequestedController.load() != 0;
     static INT LastController = -1;
@@ -61,6 +62,7 @@ static void AndroidApplyAimAssist(UNSDLViewport* Viewport, FLOAT DeltaTime)
     // Fail closed when team rules are unknown (e.g. during network map setup).
     if (!Player->GameReplicationInfo) { AndroidResetAim(); return; }
     const UBOOL TeamGame = Player->GameReplicationInfo->bTeamGame;
+    const AndroidAimMotion::Profile& Profile = AndroidAimMotion::ProfileFor(AndroidAimLevel, true);
     FVector Eye = Player->Location + FVector(0, 0, Player->EyeHeight);
     FVector Forward = Player->ViewRotation.Vector();
     APawn* Best = NULL;
@@ -79,7 +81,7 @@ static void AndroidApplyAimAssist(UNSDLViewport* Viewport, FLOAT DeltaTime)
         Direction /= Distance;
         FLOAT Dot = Forward | Direction;
         UBOOL Previous = Target == AndroidAimPrevious;
-        FLOAT Threshold = appCos((AndroidAim::Cone(AndroidAimLevel) + (Previous ? 1.5f : 0.f)) * PI / 180.f);
+        FLOAT Threshold = appCos((Profile.cone + (Previous ? 1.5f : 0.f)) * PI / 180.f);
         FLOAT Score = Dot + (Previous ? .003f : 0.f);
         if (Dot < Threshold || Score <= BestScore) continue;
         FCheckResult Hit(1.f);
@@ -90,10 +92,8 @@ static void AndroidApplyAimAssist(UNSDLViewport* Viewport, FLOAT DeltaTime)
     AndroidAimPrevious = Best;
     if (!Best) { AndroidResetAim(); return; }
     FRotator Aim = BestDirection.Rotation();
-    const float Response[] = {0.f, 4.f, 7.f, 11.f};
-    const float Speed[] = {0.f, 24.f, 48.f, 84.f};
-    INT Yaw = AndroidAimYawMotion.Step(AndroidAim::Angle(Aim.Yaw - Player->ViewRotation.Yaw), Response[AndroidAimLevel], Speed[AndroidAimLevel], DeltaTime, Stick);
-    INT Pitch = AndroidAimPitchMotion.Step(AndroidAim::Angle(Aim.Pitch - Player->ViewRotation.Pitch), Response[AndroidAimLevel], Speed[AndroidAimLevel], DeltaTime, Stick);
+    INT Yaw = AndroidAimYawMotion.Step(AndroidAim::Angle(Aim.Yaw - Player->ViewRotation.Yaw), Profile.response, Profile.speed, DeltaTime, Stick);
+    INT Pitch = AndroidAimPitchMotion.Step(AndroidAim::Angle(Aim.Pitch - Player->ViewRotation.Pitch), Profile.response, Profile.speed, DeltaTime, Stick);
     Player->ViewRotation.Yaw = (Player->ViewRotation.Yaw + Yaw) & 65535;
     Player->ViewRotation.Pitch = (Player->ViewRotation.Pitch + Pitch) & 65535;
 }

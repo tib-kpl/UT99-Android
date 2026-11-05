@@ -54,6 +54,8 @@ jobs:
         run: |
           c++ -std=c++11 -O2 -I third_party/ut99dc/Source/NSDLDrv/Src tools/native_tests/aim_smoothing.cpp -o "$RUNNER_TEMP/aim-smoothing-test"
           "$RUNNER_TEMP/aim-smoothing-test"
+          c++ -std=c++11 -O2 -I third_party/ut99dc/Source/NSDLDrv/Src tools/native_tests/aim_levels.cpp -o "$RUNNER_TEMP/aim-level-tests"
+          "$RUNNER_TEMP/aim-level-tests"
 
       - name: Build both menus
         run: |
